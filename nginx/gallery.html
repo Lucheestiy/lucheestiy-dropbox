@@ -677,7 +677,13 @@
             isZoomed: false,
             immersiveTimer: null,
             touchStartX: 0,
-            touchEndX: 0
+            touchEndX: 0,
+            // Zoom & Pan State
+            panStartX: 0,
+            panStartY: 0,
+            panX: 0,
+            panY: 0,
+            isPanning: false
         };
 
         // DOM Elements
@@ -1059,17 +1065,89 @@
         document.getElementById('fullscreenBtn').addEventListener('click', toggleBrowserFullscreen);
         document.getElementById('slideshowBtn').addEventListener('click', toggleSlideshow);
 
-        document.getElementById('zoomBtn').addEventListener('click', () => {
+        // Zoom & Pan Functions
+        function toggleZoom() {
             const img = els.modalContent.querySelector('img');
             if (!img) return;
+            
             state.isZoomed = !state.isZoomed;
-            img.style.transform = state.isZoomed ? 'scale(2)' : 'scale(1)';
-            img.style.cursor = state.isZoomed ? 'zoom-out' : 'zoom-in';
-        });
+            
+            if (state.isZoomed) {
+                img.style.transform = `scale(2.5) translate(0px, 0px)`;
+                img.style.cursor = 'grab';
+                img.style.transition = 'transform 0.3s ease';
+                state.panX = 0;
+                state.panY = 0;
+            } else {
+                img.style.transform = 'scale(1) translate(0px, 0px)';
+                img.style.cursor = 'zoom-in';
+                state.panX = 0;
+                state.panY = 0;
+            }
+        }
+
+        function startPan(e) {
+            if (!state.isZoomed) return;
+            e.preventDefault();
+            state.isPanning = true;
+            
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            
+            state.panStartX = clientX - state.panX;
+            state.panStartY = clientY - state.panY;
+            
+            const img = els.modalContent.querySelector('img');
+            if (img) {
+                img.style.cursor = 'grabbing';
+                img.style.transition = 'none'; // Disable transition for smooth dragging
+            }
+        }
+
+        function doPan(e) {
+            if (!state.isPanning || !state.isZoomed) return;
+            e.preventDefault();
+            
+            const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+            
+            state.panX = clientX - state.panStartX;
+            state.panY = clientY - state.panStartY;
+            
+            const img = els.modalContent.querySelector('img');
+            if (img) {
+                // Divide pan by scale to match 1:1 movement feel
+                img.style.transform = `scale(2.5) translate(${state.panX / 2.5}px, ${state.panY / 2.5}px)`;
+            }
+        }
+
+        function endPan() {
+            state.isPanning = false;
+            const img = els.modalContent.querySelector('img');
+            if (img && state.isZoomed) {
+                img.style.cursor = 'grab';
+            }
+        }
+
+        document.getElementById('zoomBtn').addEventListener('click', toggleZoom);
 
         // Mouse movement in modal resets immersive timer
         els.modal.addEventListener('mousemove', resetImmersiveTimer);
+        
+        // Modal Event Delegation for Panning
+        els.modalContent.addEventListener('mousedown', startPan);
+        els.modalContent.addEventListener('touchstart', startPan, {passive: false});
+        
+        window.addEventListener('mousemove', doPan);
+        window.addEventListener('touchmove', doPan, {passive: false});
+        
+        window.addEventListener('mouseup', endPan);
+        window.addEventListener('touchend', endPan);
+
         els.modal.addEventListener('click', (e) => {
+            // Prevent closing if panning occurred (simple check) or if clicking actual controls
+            if (state.isPanning) return;
+            
             if(e.target === els.modal || e.target.classList.contains('modal-content-wrapper')) {
                  // Toggle controls visibility on click/tap
                  if (document.fullscreenElement) {
