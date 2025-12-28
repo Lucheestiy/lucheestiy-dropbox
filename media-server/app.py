@@ -8,7 +8,7 @@ import os
 import zipfile
 import io
 import mimetypes
-from flask import Flask, send_file, jsonify, request
+from flask import Flask, send_file, jsonify, request, Response, stream_with_context
 from urllib.parse import quote
 import requests
 
@@ -117,6 +117,23 @@ def serve_file(share_hash, filename):
         as_attachment=(disposition == 'attachment'),
         download_name=filename
     )
+
+@app.route('/api/share/<share_hash>/download')
+def download_all(share_hash):
+    """Proxy the full ZIP download from FileBrowser"""
+    try:
+        req_url = f"{FILEBROWSER_API}/{share_hash}?download=1"
+        req = requests.get(req_url, stream=True, timeout=30)
+        req.raise_for_status()
+
+        return Response(stream_with_context(req.iter_content(chunk_size=8192)), 
+                        content_type=req.headers.get('Content-Type'),
+                        headers={
+                            'Content-Disposition': f'attachment; filename="share_{share_hash}.zip"'
+                        })
+    except Exception as e:
+        app.logger.error(f"Failed to download ZIP for {share_hash}: {e}")
+        return "Failed to download share", 500
 
 @app.route('/health')
 def health_check():

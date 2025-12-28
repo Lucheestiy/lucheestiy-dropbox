@@ -4,458 +4,978 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shared Media Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-color: #6366f1;
+            --accent-hover: #4f46e5;
+            --success-color: #10b981;
+            --modal-bg: rgba(0, 0, 0, 0.95);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            outline: none;
         }
         
         body {
-            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
             min-height: 100vh;
-            color: white;
+            color: var(--text-primary);
+            overflow-x: hidden;
         }
         
+        /* Header */
         .header {
-            text-align: center;
-            padding: 3rem 2rem 2rem;
-            background: rgba(0,0,0,0.2);
-            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 3rem 1.5rem 2rem;
+            position: relative;
+            z-index: 10;
         }
         
         .header h1 {
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: 700;
-            margin-bottom: 1rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
         }
         
         .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            text-align: center;
         }
-        
+
+        /* Controls Bar */
+        .controls-bar {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 2rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-box {
+            position: relative;
+            flex-grow: 1;
+            min-width: 250px;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            border-radius: 10px;
+            color: white;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-color);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0.5;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            padding: 0.25rem;
+            border-radius: 10px;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .filter-btn.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .sort-select {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .action-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .action-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Gallery Grid */
         .gallery-container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 0 1.5rem 3rem;
         }
-        
+
         .media-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
+            column-count: 4;
+            column-gap: 1.5rem;
         }
-        
+
+        @media (max-width: 1200px) {
+            .media-grid { column-count: 3; }
+        }
+        @media (max-width: 900px) {
+            .media-grid { column-count: 2; }
+            .controls-bar { flex-direction: column; align-items: stretch; }
+            .header h1 { font-size: 2rem; }
+        }
+        @media (max-width: 600px) {
+            .media-grid { column-count: 1; }
+        }
+
         .media-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            border-radius: 20px;
+            break-inside: avoid;
+            background: var(--card-bg);
+            backdrop-filter: blur(5px);
+            border-radius: 16px;
             overflow: hidden;
-            transition: all 0.4s ease;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
         }
-        
+
         .media-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.1);
         }
-        
+
+        .media-preview-container {
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
         .media-preview {
             width: 100%;
-            height: 250px;
-            object-fit: cover;
-            cursor: pointer;
-            transition: transform 0.3s ease;
+            height: auto;
+            display: block;
+            transition: transform 0.5s ease;
         }
-        
-        .media-preview:hover {
-            transform: scale(1.05);
+
+        .media-card:hover .media-preview {
+            transform: scale(1.03);
         }
-        
-        .media-info {
-            padding: 1.5rem;
-        }
-        
-        .media-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-            color: #fff;
-        }
-        
-        .media-type {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-        
-        .actions {
-            display: flex;
-            gap: 1rem;
-        }
-        
-        .btn {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            text-decoration: none;
-            text-align: center;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.95);
-            backdrop-filter: blur(5px);
-        }
-        
-        .modal-content {
+
+        .play-icon {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            max-width: 95%;
-            max-height: 95%;
-        }
-        
-        .modal img, .modal video {
-            max-width: 100%;
-            max-height: 100%;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        }
-        
-        .close {
-            position: absolute;
-            top: 30px;
-            right: 50px;
-            color: #fff;
-            font-size: 50px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1001;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .close:hover {
-            color: #667eea;
-            transform: scale(1.1);
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 4rem;
-            color: rgba(255, 255, 255, 0.8);
-        }
-        
-        .loading h2 {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-        }
-        
-        .loader {
-            border: 4px solid rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            border-top: 4px solid #667eea;
             width: 50px;
             height: 50px;
-            animation: spin 2s linear infinite;
-            margin: 2rem auto;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        .media-info {
+            padding: 1rem;
+        }
+
+        .media-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+
+        .media-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .card-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .card-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            padding: 0.5rem;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            text-decoration: none;
+        }
+
+        .card-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-btn.primary {
+            background: var(--accent-color);
+        }
+        .card-btn.primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: var(--modal-bg);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            opacity: 1;
+        }
+
+        .modal-content-wrapper {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-media {
+            max-width: 90%;
+            max-height: 85vh;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            object-fit: contain;
+            transition: transform 0.3s ease, max-height 0.3s ease, max-width 0.3s ease;
+        }
+
+        /* Immersive Mode */
+        .modal.immersive {
+            background: black;
+            cursor: none; /* Hide cursor by default */
         }
         
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .modal.immersive.active-user {
+            cursor: default;
         }
-        
-        .error {
+
+        .modal.immersive .modal-media {
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
+        }
+
+        .modal-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            z-index: 10;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .modal-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 2rem 1.5rem;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
             text-align: center;
-            padding: 4rem;
-            color: #ff6b6b;
+            z-index: 10;
+            transition: opacity 0.5s ease, transform 0.5s ease;
         }
         
-        .error h2 {
-            font-size: 2rem;
-            margin-bottom: 1rem;
+        /* Hide controls in immersive mode unless active */
+        .modal.immersive:not(.active-user) .modal-header {
+            opacity: 0;
+            transform: translateY(-20px);
+            pointer-events: none;
         }
         
+        .modal.immersive:not(.active-user) .modal-footer {
+            opacity: 0;
+            transform: translateY(20px);
+            pointer-events: none;
+        }
+
+        .modal.immersive:not(.active-user) .nav-btn {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .modal-controls {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.2rem;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.5);
+            border: none;
+            color: white;
+            padding: 1rem;
+            cursor: pointer;
+            z-index: 5;
+            transition: opacity 0.5s ease;
+            border-radius: 50%;
+            margin: 0 1rem;
+        }
+        
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-prev { left: 0; }
+        .nav-next { right: 0; }
+
         .file-placeholder {
+            height: 200px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 250px;
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem;
         }
         
-        .file-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 2000;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon {
+            color: var(--success-color);
+            font-size: 1.2rem;
+        }
+
+        /* SVG Icons helpers */
+        .icon { width: 1em; height: 1em; fill: currentColor; }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 1rem;
+            color: var(--text-secondary);
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>📸 Shared Media Gallery</h1>
-        <p>View photos and videos shared with you</p>
+        <h1>Shared Media Gallery</h1>
+        <p>Viewing files shared via Droppr</p>
+        
+        <div class="controls-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Search files...">
+            </div>
+            
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="image">Images</button>
+                <button class="filter-btn" data-filter="video">Videos</button>
+            </div>
+
+            <select class="sort-select" id="sortSelect">
+                <option value="type_asc">Type (Images first)</option>
+                <option value="type_desc">Type (Videos first)</option>
+                <option value="name_asc">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="size_desc">Size (Largest)</option>
+                <option value="size_asc">Size (Smallest)</option>
+            </select>
+
+            <button class="action-btn secondary" id="copyLinkBtn">
+                🔗 Share
+            </button>
+            
+            <a href="#" id="downloadAllBtn" class="action-btn">
+                ⬇️ Download All
+            </a>
+        </div>
     </div>
     
     <div class="gallery-container">
         <div id="loading" class="loading">
-            <h2>Loading your media...</h2>
-            <div class="loader"></div>
+            <div class="spinner"></div>
+            <p>Loading gallery...</p>
         </div>
         
-        <div id="error" class="error" style="display: none;">
-            <h2>❌ Oops! Something went wrong</h2>
-            <p>We couldn't load your shared media files.</p>
-        </div>
+        <div id="galleryGrid" class="media-grid"></div>
         
-        <div id="media-container" class="media-grid" style="display: none;">
-            <!-- Media files will be populated here -->
-        </div>
-    </div>
-    
-    <!-- Modal for full-size viewing -->
-    <div id="modal" class="modal">
-        <span class="close">&times;</span>
-        <div class="modal-content" id="modal-content">
-            <!-- Media will be displayed here -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>No files found</h3>
+            <p>Try adjusting your search or filters</p>
         </div>
     </div>
 
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-header">
+            <div class="modal-controls">
+                <button class="icon-btn" id="zoomBtn" title="Zoom">🔍</button>
+                <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
+                <button class="icon-btn" id="slideshowBtn" title="Slideshow">▶</button>
+            </div>
+            <button class="icon-btn" id="closeBtn" title="Close">×</button>
+        </div>
+        
+        <button class="nav-btn nav-prev" id="prevBtn">❮</button>
+        <button class="nav-btn nav-next" id="nextBtn">❯</button>
+        
+        <div class="modal-content-wrapper" id="modalContent">
+            <!-- Media injected here -->
+        </div>
+        
+        <div class="modal-footer">
+            <h3 id="modalTitle">Filename</h3>
+            <p id="modalMeta">Meta info</p>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast">
+        <span class="toast-icon">✓</span>
+        <span id="toastMessage">Action successful</span>
+    </div>
+
     <script>
-        // Get share hash from URL parameters or path
-        const urlParams = new URLSearchParams(window.location.search);
-        const shareHash = urlParams.get('share') || window.location.pathname.split('/').pop();
-        
-        // Modal elements
-        const modal = document.getElementById('modal');
-        const modalContent = document.getElementById('modal-content');
-        const closeBtn = document.querySelector('.close');
-        
-        // Common media file extensions
-        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-        const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'ogg', 'm4v'];
-        
-        // Extract files from ZIP blob (basic implementation)
-        async function extractFilesFromZip(zipBlob) {
-            // For now, we'll use known file names since ZIP parsing is complex
-            // In production, you'd want to use a proper ZIP library
-            const knownFiles = [
-                'IMG_4481.jpeg',
-                'IMG_4482.mov', 
-                'IMG_4491.jpeg'
-            ];
-            
-            return knownFiles.map(filename => {
-                const extension = filename.split('.').pop().toLowerCase();
-                const isImage = imageExtensions.includes(extension);
-                const isVideo = videoExtensions.includes(extension);
-                
-                return {
-                    name: filename,
-                    type: isImage ? 'image' : isVideo ? 'video' : 'unknown',
-                    extension: extension
-                };
-            });
-        }
-        
-        // Load media files using the new media server
-        async function loadMediaFiles() {
+        // State
+        const state = {
+            files: [],
+            filteredFiles: [],
+            currentIndex: 0,
+            shareHash: new URLSearchParams(window.location.search).get('share') || window.location.pathname.split('/').pop(),
+            filter: 'all',
+            sort: 'type_asc', // Default sort by type
+            search: '',
+            isSlideshow: false,
+            slideshowInterval: null,
+            isZoomed: false,
+            immersiveTimer: null
+        };
+
+        // DOM Elements
+        const els = {
+            grid: document.getElementById('galleryGrid'),
+            loading: document.getElementById('loading'),
+            empty: document.getElementById('emptyState'),
+            search: document.getElementById('searchInput'),
+            sort: document.getElementById('sortSelect'),
+            filters: document.querySelectorAll('.filter-btn'),
+            modal: document.getElementById('modal'),
+            modalContent: document.getElementById('modalContent'),
+            modalTitle: document.getElementById('modalTitle'),
+            modalMeta: document.getElementById('modalMeta'),
+            downloadAll: document.getElementById('downloadAllBtn'),
+            copyLink: document.getElementById('copyLinkBtn')
+        };
+
+        // Initialize
+        async function init() {
+            if (!state.shareHash || state.shareHash === 'gallery') {
+                showToast('Invalid share link', 'error');
+                return;
+            }
+
+            // Setup download link
+            els.downloadAll.href = `/api/share/${state.shareHash}/download`;
+
+            // Load data
             try {
-                const response = await fetch(`/api/share/${shareHash}/files`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const files = await response.json();
-                
-                if (files.length === 0) {
-                    throw new Error('No media files found in share');
-                }
-                
-                displayMediaFiles(files);
-                
-            } catch (error) {
-                console.error('Error loading media files:', error);
-                showError();
+                const res = await fetch(`/api/share/${state.shareHash}/files`);
+                if (!res.ok) throw new Error('Failed to load files');
+                state.files = await res.json();
+                filterAndRender();
+            } catch (err) {
+                console.error(err);
+                els.loading.innerHTML = `<p style="color: #ef4444">Failed to load gallery. Please try again.</p>`;
             }
         }
-        
-        function displayMediaFiles(files) {
-            const container = document.getElementById('media-container');
-            const loading = document.getElementById('loading');
+
+        // Filtering & Sorting
+        function filterAndRender() {
+            els.loading.style.display = 'none';
             
-            loading.style.display = 'none';
-            container.style.display = 'grid';
+            // Filter
+            state.filteredFiles = state.files.filter(file => {
+                const matchesType = state.filter === 'all' || file.type === state.filter;
+                const matchesSearch = file.name.toLowerCase().includes(state.search.toLowerCase());
+                return matchesType && matchesSearch;
+            });
+
+            // Sort
+            state.filteredFiles.sort((a, b) => {
+                switch(state.sort) {
+                    case 'type_asc': 
+                        // Images first, then videos, then others
+                        const typeScore = (t) => t === 'image' ? 1 : (t === 'video' ? 2 : 3);
+                        const typeDiff = typeScore(a.type) - typeScore(b.type);
+                        return typeDiff !== 0 ? typeDiff : a.name.localeCompare(b.name);
+                    case 'type_desc': 
+                        // Videos first, then images, then others
+                        const typeScoreDesc = (t) => t === 'video' ? 1 : (t === 'image' ? 2 : 3);
+                        const typeDiffDesc = typeScoreDesc(a.type) - typeScoreDesc(b.type);
+                        return typeDiffDesc !== 0 ? typeDiffDesc : a.name.localeCompare(b.name);
+                    case 'name_asc': return a.name.localeCompare(b.name);
+                    case 'name_desc': return b.name.localeCompare(a.name);
+                    case 'size_asc': return a.size - b.size;
+                    case 'size_desc': return b.size - a.size;
+                    default: return 0;
+                }
+            });
+
+            renderGrid();
+        }
+
+        function renderGrid() {
+            els.grid.innerHTML = '';
             
-            files.forEach(file => {
-                const card = createMediaCard(file);
-                container.appendChild(card);
+            if (state.filteredFiles.length === 0) {
+                els.empty.style.display = 'block';
+                return;
+            }
+            
+            els.empty.style.display = 'none';
+            
+            state.filteredFiles.forEach((file, index) => {
+                const card = document.createElement('div');
+                card.className = 'media-card';
+                card.innerHTML = createCardHTML(file, index);
+                els.grid.appendChild(card);
             });
         }
-        
-        function createMediaCard(file) {
-            const card = document.createElement('div');
-            card.className = 'media-card';
-            
+
+        function createCardHTML(file, index) {
+            const fileUrl = `/api/share/${state.shareHash}/file/${encodeURIComponent(file.name)}`;
             const isVideo = file.type === 'video';
             const isImage = file.type === 'image';
             
-            // Use the new media server URLs
-            const fileUrl = `/api/share/${shareHash}/file/${encodeURIComponent(file.name)}`;
-            const downloadUrl = fileUrl; // Same URL, browser will handle appropriately
-            
-            // Format file size
-            const formatSize = (bytes) => {
-                if (bytes === 0) return '0 B';
-                const k = 1024;
-                const sizes = ['B', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-            };
-            
-            let mediaHTML;
-            
-            if (isVideo) {
-                mediaHTML = `
-                    <div class="media-preview" onclick="openModal('${file.name}', 'video')">
-                        <div class="file-placeholder">
-                            <div class="file-icon">🎬</div>
-                            <div>${file.name}</div>
+            let preview = '';
+            if (isImage) {
+                preview = `<img class="media-preview" src="${fileUrl}" loading="lazy" alt="${file.name}" onerror="this.parentElement.innerHTML='<div class=\'file-placeholder\'>⚠️ Image Error</div>'">`;
+            } else if (isVideo) {
+                preview = `
+                    <div class="media-preview-container">
+                        <div class="file-placeholder" style="background: #000;">
+                            <video src="${fileUrl}#t=0.1" preload="metadata" style="width:100%; height:100%; object-fit:cover;"></video>
                         </div>
-                    </div>
-                `;
-            } else if (isImage) {
-                mediaHTML = `
-                    <img class="media-preview" 
-                         src="${fileUrl}" 
-                         alt="${file.name}" 
-                         onclick="openModal('${file.name}', 'image')"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                    <div class="file-placeholder" style="display:none;">
-                        <div class="file-icon">🖼️</div>
-                        <div>${file.name}</div>
+                        <div class="play-icon">▶</div>
                     </div>
                 `;
             } else {
-                mediaHTML = `
+                preview = `
                     <div class="file-placeholder">
-                        <div class="file-icon">📁</div>
-                        <div>${file.name}</div>
+                        <div style="font-size: 3rem; margin-bottom: 1rem">📄</div>
+                        <div>${file.extension.toUpperCase()}</div>
                     </div>
                 `;
             }
-            
-            card.innerHTML = `
-                ${mediaHTML}
+
+            return `
+                <div class="media-preview-container" onclick="openModal(${index})">
+                    ${preview}
+                </div>
                 <div class="media-info">
-                    <div class="media-title">${file.name}</div>
-                    <div class="media-type">${file.type.toUpperCase()} • ${file.extension.toUpperCase()} • ${formatSize(file.size)}</div>
-                    <div class="actions">
-                        <button class="btn btn-primary" onclick="openModal('${file.name}', '${file.type}')">
-                            ${isVideo ? '▶️ Play' : '👁️ View'}
+                    <div class="media-title" title="${file.name}">${file.name}</div>
+                    <div class="media-meta">
+                        <span>${file.extension.toUpperCase()}</span>
+                        <span>${formatSize(file.size)}</span>
+                    </div>
+                    <div class="card-actions">
+                        <button class="card-btn primary" onclick="openModal(${index})">
+                            ${isVideo ? 'Play' : 'View'}
                         </button>
-                        <a href="${downloadUrl}" 
-                           class="btn btn-secondary" download="${file.name}">
-                            💾 Download
+                        <a href="${fileUrl}" download="${file.name}" class="card-btn">
+                            Download
                         </a>
                     </div>
                 </div>
             `;
-            
-            return card;
         }
-        
-        function openModal(filename, type) {
-            const isVideo = type === 'video';
-            const fileUrl = `/api/share/${shareHash}/file/${encodeURIComponent(filename)}`;
+
+        // Modal Functions
+        window.openModal = function(index) {
+            state.currentIndex = index;
+            els.modal.style.display = 'block';
+            // Force reflow for transition
+            els.modal.offsetHeight;
+            els.modal.classList.add('show');
+            updateModalContent();
+            resetImmersiveTimer();
+        };
+
+        function updateModalContent() {
+            const file = state.filteredFiles[state.currentIndex];
+            const fileUrl = `/api/share/${state.shareHash}/file/${encodeURIComponent(file.name)}`;
             
-            if (isVideo) {
-                modalContent.innerHTML = `
-                    <video controls autoplay style="max-width: 100%; max-height: 100%; border-radius: 15px;">
-                        <source src="${fileUrl}" type="video/mp4">
-                        <source src="${fileUrl}" type="video/quicktime">
-                        Your browser doesn't support video playback.
+            els.modalTitle.textContent = file.name;
+            els.modalMeta.textContent = `${state.currentIndex + 1} of ${state.filteredFiles.length} • ${formatSize(file.size)}`;
+            
+            els.modalContent.innerHTML = '';
+            
+            if (file.type === 'video') {
+                els.modalContent.innerHTML = `
+                    <video class="modal-media" controls autoplay playsinline>
+                        <source src="${fileUrl}" type="video/${file.extension === 'mov' ? 'quicktime' : 'mp4'}">
+                        Your browser does not support video.
                     </video>
                 `;
+            } else if (file.type === 'image') {
+                els.modalContent.innerHTML = `
+                    <img class="modal-media" src="${fileUrl}" alt="${file.name}">
+                `;
             } else {
-                modalContent.innerHTML = `
-                    <img src="${fileUrl}" alt="${filename}" 
-                         style="max-width: 100%; max-height: 100%; border-radius: 15px;">
+                els.modalContent.innerHTML = `
+                    <div style="text-align: center; color: white;">
+                        <div style="font-size: 5rem; margin-bottom: 2rem">📄</div>
+                        <p>Preview not available for this file type.</p>
+                        <a href="${fileUrl}" class="action-btn" style="margin-top: 1rem; display: inline-block;">Download File</a>
+                    </div>
                 `;
             }
+
+            // Update nav buttons
+            document.getElementById('prevBtn').style.display = state.currentIndex > 0 ? 'block' : 'none';
+            document.getElementById('nextBtn').style.display = state.currentIndex < state.filteredFiles.length - 1 ? 'block' : 'none';
+        }
+
+        function closeModal() {
+            els.modal.classList.remove('show');
+            exitFullscreen(); // Ensure we exit browser fullscreen too
+            setTimeout(() => {
+                els.modal.style.display = 'none';
+                els.modalContent.innerHTML = ''; // Stop video playback
+                stopSlideshow();
+                state.isZoomed = false;
+                els.modal.classList.remove('immersive'); // Reset immersive state
+            }, 300);
+        }
+
+        function navigate(dir) {
+            const newIndex = state.currentIndex + dir;
+            if (newIndex >= 0 && newIndex < state.filteredFiles.length) {
+                state.currentIndex = newIndex;
+                updateModalContent();
+                resetImmersiveTimer();
+            }
+        }
+
+        // Utilities
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function toggleSlideshow() {
+            if (state.isSlideshow) {
+                stopSlideshow();
+            } else {
+                startSlideshow();
+            }
+        }
+
+        function startSlideshow() {
+            state.isSlideshow = true;
+            document.getElementById('slideshowBtn').innerHTML = '⏸';
+            showToast('Slideshow started');
+            state.slideshowInterval = setInterval(() => {
+                if (state.currentIndex < state.filteredFiles.length - 1) {
+                    navigate(1);
+                } else {
+                    state.currentIndex = 0;
+                    updateModalContent();
+                }
+            }, 3000);
             
-            modal.style.display = 'block';
+            // Enter fullscreen automatically for slideshow
+            if (!document.fullscreenElement) {
+                toggleBrowserFullscreen();
+            }
         }
-        
-        function showError() {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
+
+        function stopSlideshow() {
+            state.isSlideshow = false;
+            document.getElementById('slideshowBtn').innerHTML = '▶';
+            if (state.slideshowInterval) clearInterval(state.slideshowInterval);
         }
-        
-        // Modal event handlers
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
+
+        // Fullscreen & Immersive Mode Logic
+        function toggleBrowserFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(e => console.log(e));
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+        }
+
+        // Monitor fullscreen change to toggle immersive mode class
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                els.modal.classList.add('immersive');
+                resetImmersiveTimer();
+            } else {
+                els.modal.classList.remove('immersive');
+                els.modal.classList.remove('active-user');
+                clearTimeout(state.immersiveTimer);
             }
         });
+
+        // Immersive UI timer
+        function resetImmersiveTimer() {
+            if (!document.fullscreenElement) return;
+            
+            els.modal.classList.add('active-user');
+            clearTimeout(state.immersiveTimer);
+            
+            state.immersiveTimer = setTimeout(() => {
+                // Only hide if not hovering over controls directly (optional enhancement, simple timer for now)
+                els.modal.classList.remove('active-user');
+            }, 3000); // Hide after 3 seconds of inactivity
+        }
+
+        // Event Listeners
+        els.search.addEventListener('input', (e) => {
+            state.search = e.target.value;
+            filterAndRender();
+        });
+
+        els.sort.addEventListener('change', (e) => {
+            state.sort = e.target.value;
+            filterAndRender();
+        });
+
+        els.filters.forEach(btn => {
+            btn.addEventListener('click', () => {
+                els.filters.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.filter = btn.dataset.filter;
+                filterAndRender();
+            });
+        });
+
+        els.copyLink.addEventListener('click', () => {
+            navigator.clipboard.writeText(window.location.href);
+            showToast('Link copied to clipboard');
+        });
+
+        document.getElementById('closeBtn').addEventListener('click', closeModal);
+        document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
+        document.getElementById('nextBtn').addEventListener('click', () => navigate(1));
         
-        // Keyboard shortcuts
+        document.getElementById('fullscreenBtn').addEventListener('click', toggleBrowserFullscreen);
+        document.getElementById('slideshowBtn').addEventListener('click', toggleSlideshow);
+
+        document.getElementById('zoomBtn').addEventListener('click', () => {
+            const img = els.modalContent.querySelector('img');
+            if (!img) return;
+            state.isZoomed = !state.isZoomed;
+            img.style.transform = state.isZoomed ? 'scale(2)' : 'scale(1)';
+            img.style.cursor = state.isZoomed ? 'zoom-out' : 'zoom-in';
+        });
+
+        // Mouse movement in modal resets immersive timer
+        els.modal.addEventListener('mousemove', resetImmersiveTimer);
+        els.modal.addEventListener('click', (e) => {
+            if(e.target === els.modal || e.target.classList.contains('modal-content-wrapper')) {
+                 // Toggle controls visibility on click/tap
+                 if (document.fullscreenElement) {
+                     els.modal.classList.toggle('active-user');
+                     if (els.modal.classList.contains('active-user')) {
+                         resetImmersiveTimer();
+                     } else {
+                         clearTimeout(state.immersiveTimer);
+                     }
+                 }
+            }
+        });
+
+        // Keyboard support
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                modal.style.display = 'none';
+            if (els.modal.style.display === 'block') {
+                if (e.key === 'Escape') closeModal(); // Browser handles fullscreen exit on ESC usually, but this closes modal
+                if (e.key === 'ArrowLeft') navigate(-1);
+                if (e.key === 'ArrowRight') navigate(1);
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    toggleSlideshow();
+                }
+                
+                resetImmersiveTimer();
             }
         });
-        
-        // Initialize
-        if (shareHash && shareHash !== 'gallery') {
-            loadMediaFiles();
-        } else {
-            showError();
-        }
+
+        init();
     </script>
 </body>
 </html>
