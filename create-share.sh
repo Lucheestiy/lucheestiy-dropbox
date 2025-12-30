@@ -1,12 +1,30 @@
 #!/bin/bash
 # Script to create FileBrowser shares via API
+# Usage: ./create-share.sh [path]
+# Example: ./create-share.sh /2
 
 echo "Creating new share for folder..."
+
+# Use environment variable or prompt for credentials
+if [ -z "$DROPPR_PASSWORD" ]; then
+    # Try to read from .env file
+    if [ -f .env ] && grep -q DROPPR_PASSWORD .env; then
+        source .env
+    fi
+fi
+
+DROPPR_USER="${DROPPR_USER:-admin}"
+if [ -z "$DROPPR_PASSWORD" ]; then
+    echo "Error: DROPPR_PASSWORD environment variable not set"
+    echo "Set it via: export DROPPR_PASSWORD='your_password'"
+    echo "Or add DROPPR_PASSWORD=your_password to .env file"
+    exit 1
+fi
 
 # Login and get token
 TOKEN=$(curl -s -X POST https://droppr.coolmri.com/api/login \
     -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"4E1LHCsY_0jnk51J"}')
+    -d "{\"username\":\"$DROPPR_USER\",\"password\":\"$DROPPR_PASSWORD\"}")
 
 echo "Got authentication token"
 
