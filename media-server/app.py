@@ -1157,6 +1157,19 @@ def download_all(share_hash: str):
     if not is_valid_share_hash(share_hash):
         return "Invalid share hash", 400
 
+    # Check if this is a single-file share (video/image) that needs range request support
+    # Mobile browsers require range requests for video playback
+    data = _fetch_public_share_json(share_hash)
+    if data and not isinstance(data.get("items"), list):
+        # Single-file share - redirect to FileBrowser endpoint which supports range requests
+        # This is critical for mobile video playback
+        _log_event("file_download", share_hash)
+        inline = request.args.get("inline") or request.args.get("play")
+        if inline:
+            return redirect(f"/api/public/file/{share_hash}?inline=true", code=302)
+        return redirect(f"/api/public/file/{share_hash}", code=302)
+
+    # Folder share - stream ZIP through proxy (no range support needed for ZIP downloads)
     try:
         req_url = f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}?download=1"
         req = requests.get(req_url, stream=True, timeout=120)
