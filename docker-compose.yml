@@ -42,6 +42,7 @@ services:
     user: "1000:1000"
     volumes:
       - ./data:/srv
+      - ./database:/database
     environment:
       - WATCH_DIR=/srv
     depends_on:

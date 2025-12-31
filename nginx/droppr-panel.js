@@ -2,6 +2,7 @@
   if (window.__dropprPanelBooted) return;
   window.__dropprPanelBooted = true;
 
+  var DROPPR_PANEL_VERSION = "15";
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
   var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
@@ -11,6 +12,12 @@
   var AUTO_SHARE_MODAL_ID = "droppr-auto-share-modal";
   var ICLOUD_WAIT_STYLE_ID = "droppr-icloud-wait-style";
   var ICLOUD_WAIT_MODAL_ID = "droppr-icloud-wait";
+  var VIDEO_META_STYLE_ID = "droppr-video-meta-style";
+  var VIDEO_META_PANEL_ID = "droppr-video-meta";
+  var VIDEO_META_INLINE_ID = "droppr-video-meta-inline";
+  var VIDEO_ROW_DETAILS_CLASS = "droppr-video-row-details";
+  var VIDEO_DETAILS_ROW_CLASS = "droppr-video-details-row";
+  var DEBUG_BADGE_ID = "droppr-debug-badge";
 
   var uploadBatch = null;
   var tusUploads = {};
@@ -19,8 +26,53 @@
   var fileInputBypass = false;
   var fileInputGate = null;
 
+  var videoMetaCache = {};
+  var videoMetaInFlight = {};
+  var videoMetaActivePath = null;
+  var videoMetaDismissedPath = null;
+  var videoMetaPollTimer = null;
+  var filesVideoHydrateTimer = null;
+  var filesVideoLastPathname = null;
+  var videoMetaDebugStats = { ok: 0, notFound: 0, unauth: 0, other: 0 };
+
   function nowMs() {
     return new Date().getTime();
+  }
+
+  function isDropprDebugEnabled() {
+    try {
+      return /(?:^|[?&])dropprDebug=1(?:&|$)/.test(String(window.location && window.location.search) || "");
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function ensureDebugBadge() {
+    if (!isDropprDebugEnabled()) return null;
+
+    var existing = document.getElementById(DEBUG_BADGE_ID);
+    if (existing) return existing;
+
+    var el = document.createElement("div");
+    el.id = DEBUG_BADGE_ID;
+    el.style.cssText =
+      "position:fixed;left:10px;bottom:10px;z-index:2147483647;" +
+      "max-width:min(92vw, 520px);" +
+      "padding:8px 10px;border-radius:12px;" +
+      "background:rgba(2,6,23,0.88);border:1px solid rgba(255,255,255,0.14);" +
+      "color:rgba(241,245,249,0.96);" +
+      "font:12px/1.35 Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;" +
+      "box-shadow:0 18px 40px -18px rgba(0,0,0,0.75);" +
+      "user-select:text;cursor:text;";
+    el.textContent = "Droppr enhancements v" + DROPPR_PANEL_VERSION + " loading…";
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function setDebugBadge(text) {
+    var badge = ensureDebugBadge();
+    if (!badge) return;
+    badge.textContent = text;
   }
 
   function getCookie(name) {
@@ -119,6 +171,1050 @@
       '<span class="label">Analytics</span>';
 
     document.body.appendChild(a);
+  }
+
+  function ensureVideoMetaStyles() {
+    if (document.getElementById(VIDEO_META_STYLE_ID)) return;
+
+    var style = document.createElement("style");
+    style.id = VIDEO_META_STYLE_ID;
+    style.textContent =
+      "#" + VIDEO_META_PANEL_ID + " {\n" +
+      "  position: fixed;\n" +
+      "  right: 18px;\n" +
+      "  bottom: 74px;\n" +
+      "  z-index: 2147482999;\n" +
+      "  width: min(460px, calc(100vw - 36px));\n" +
+      "  background: rgba(15, 23, 42, 0.92);\n" +
+      "  border: 1px solid rgba(255,255,255,0.14);\n" +
+      "  border-radius: 14px;\n" +
+      "  box-shadow: 0 18px 40px -18px rgba(0,0,0,0.75);\n" +
+      "  padding: 12px;\n" +
+      "  color: #f1f5f9;\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  display: none;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .hdr {\n" +
+      "  display: flex;\n" +
+      "  align-items: center;\n" +
+      "  justify-content: space-between;\n" +
+      "  gap: 10px;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .title {\n" +
+      "  font-weight: 800;\n" +
+      "  font-size: 13px;\n" +
+      "  letter-spacing: -0.01em;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .close {\n" +
+      "  appearance: none;\n" +
+      "  border: 1px solid rgba(255,255,255,0.2);\n" +
+      "  background: rgba(255,255,255,0.08);\n" +
+      "  color: #fff;\n" +
+      "  width: 28px;\n" +
+      "  height: 28px;\n" +
+      "  border-radius: 10px;\n" +
+      "  cursor: pointer;\n" +
+      "  font-weight: 800;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .path {\n" +
+      "  margin-top: 6px;\n" +
+      "  font-size: 12px;\n" +
+      "  opacity: 0.82;\n" +
+      "  word-break: break-word;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .grid {\n" +
+      "  margin-top: 10px;\n" +
+      "  display: grid;\n" +
+      "  gap: 7px;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .row {\n" +
+      "  display: flex;\n" +
+      "  align-items: baseline;\n" +
+      "  justify-content: space-between;\n" +
+      "  gap: 12px;\n" +
+      "  font-size: 12px;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .k {\n" +
+      "  opacity: 0.78;\n" +
+      "  white-space: nowrap;\n" +
+      "}\n" +
+      "#" + VIDEO_META_PANEL_ID + " .v {\n" +
+      "  text-align: right;\n" +
+      "  overflow: hidden;\n" +
+      "  text-overflow: ellipsis;\n" +
+      "}\n" +
+      "#" + VIDEO_META_INLINE_ID + " {\n" +
+      "  margin-top: 10px;\n" +
+      "  padding: 10px 12px;\n" +
+      "  border-radius: 12px;\n" +
+      "  background: rgba(15, 23, 42, 0.85);\n" +
+      "  border: 1px solid rgba(255,255,255,0.14);\n" +
+      "  box-shadow: 0 12px 26px -18px rgba(0,0,0,0.75);\n" +
+      "  color: #f1f5f9;\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  font-size: 12px;\n" +
+      "  line-height: 1.35;\n" +
+      "}\n" +
+      "#" + VIDEO_META_INLINE_ID + " .line {\n" +
+      "  display: block;\n" +
+      "  opacity: 0.95;\n" +
+      "  white-space: nowrap;\n" +
+      "  overflow: hidden;\n" +
+      "  text-overflow: ellipsis;\n" +
+      "}\n" +
+      "#" + VIDEO_META_INLINE_ID + " .muted {\n" +
+      "  opacity: 0.75;\n" +
+      "}\n" +
+      "." + VIDEO_ROW_DETAILS_CLASS + " {\n" +
+      "  margin-top: 6px;\n" +
+      "  padding: 8px 10px;\n" +
+      "  border-radius: 12px;\n" +
+      "  background: rgba(15, 23, 42, 0.78);\n" +
+      "  border: 1px solid rgba(148, 163, 184, 0.22);\n" +
+      "  color: rgba(248, 250, 252, 0.98) !important;\n" +
+      "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
+      "  font-size: 11px;\n" +
+      "  line-height: 1.35;\n" +
+      "  backdrop-filter: blur(8px);\n" +
+      "  -webkit-backdrop-filter: blur(8px);\n" +
+      "  user-select: text;\n" +
+      "  cursor: text;\n" +
+      "}\n" +
+      "." + VIDEO_ROW_DETAILS_CLASS + " .line {\n" +
+      "  display: block;\n" +
+      "  color: rgba(248, 250, 252, 0.98) !important;\n" +
+      "  white-space: normal;\n" +
+      "  overflow-wrap: anywhere;\n" +
+      "  word-break: break-word;\n" +
+      "}\n" +
+      "." + VIDEO_ROW_DETAILS_CLASS + " .muted {\n" +
+      "  opacity: 0.88;\n" +
+      "  color: rgba(203, 213, 225, 0.96) !important;\n" +
+      "}\n" +
+      "." + VIDEO_DETAILS_ROW_CLASS + " {\n" +
+      "  user-select: text;\n" +
+      "}\n" +
+      "#listing:not(.list) ." + VIDEO_ROW_DETAILS_CLASS + " {\n" +
+      "  position: static;\n" +
+      "  margin-top: 4px;\n" +
+      "  padding: 6px 8px;\n" +
+      "  font-size: 10px;\n" +
+      "  line-height: 1.25;\n" +
+      "  background: rgba(2, 6, 23, 0.84);\n" +
+      "  border-color: rgba(148, 163, 184, 0.24);\n" +
+      "}\n";
+
+    document.head.appendChild(style);
+  }
+
+  function ensureVideoMetaPanel() {
+    var existing = document.getElementById(VIDEO_META_PANEL_ID);
+    if (existing) return existing;
+
+    ensureVideoMetaStyles();
+
+    var panel = document.createElement("div");
+    panel.id = VIDEO_META_PANEL_ID;
+    panel.innerHTML =
+      '<div class="hdr">' +
+      '<div class="title">Video details</div>' +
+      '<button class="close" type="button" aria-label="Hide">×</button>' +
+      "</div>" +
+      '<div id="droppr-video-meta-path" class="path"></div>' +
+      '<div class="grid">' +
+      '<div class="row"><div class="k">Status</div><div id="droppr-video-meta-status" class="v"></div></div>' +
+      '<div class="row"><div class="k">Uploaded</div><div id="droppr-video-meta-uploaded" class="v"></div></div>' +
+      '<div class="row"><div class="k">Processed at</div><div id="droppr-video-meta-processed-at" class="v"></div></div>' +
+      '<div class="row"><div class="k">Original</div><div id="droppr-video-meta-original" class="v"></div></div>' +
+      '<div class="row"><div class="k">After</div><div id="droppr-video-meta-processed" class="v"></div></div>' +
+      '<div class="row"><div class="k">Action</div><div id="droppr-video-meta-action" class="v"></div></div>' +
+      "</div>";
+
+    panel.querySelector(".close").addEventListener("click", function () {
+      videoMetaDismissedPath = videoMetaActivePath || videoMetaDismissedPath;
+      panel.style.display = "none";
+    });
+
+    document.body.appendChild(panel);
+    return panel;
+  }
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "";
+    var units = ["B", "KB", "MB", "GB", "TB"];
+    var v = bytes;
+    var i = 0;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    var digits = v >= 100 || i === 0 ? 0 : v >= 10 ? 1 : 2;
+    return v.toFixed(digits) + " " + units[i];
+  }
+
+  function formatDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "";
+    var s = Math.floor(seconds);
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    if (h > 0) return h + ":" + String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+    return m + ":" + String(sec).padStart(2, "0");
+  }
+
+  function actionLabel(action) {
+    var a = String(action || "").toLowerCase();
+    if (a === "transcode_hevc_to_h264") return "Transcoded HEVC → H.264";
+    if (a === "fix_video_errors_extra_streams") return "Re-encoded (removed extra streams)";
+    if (a === "fix_video_errors_timestamp") return "Re-encoded (fixed timestamps)";
+    if (a === "faststart") return "Faststart (moov moved)";
+    if (a === "already_faststart") return "Already faststart";
+    if (a === "none") return "No changes";
+    return action ? String(action) : "";
+  }
+
+  function safeToIso(tsSeconds) {
+    if (tsSeconds == null) return "";
+    var n = parseInt(String(tsSeconds), 10);
+    if (isNaN(n) || n <= 0) return "";
+    try {
+      return new Date(n * 1000).toLocaleString();
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function renderMetaSummary(meta, sizeOverride) {
+    if (!meta || typeof meta !== "object") {
+      if (Number.isFinite(sizeOverride) && sizeOverride > 0) return formatBytes(sizeOverride);
+      return "—";
+    }
+
+    var size = null;
+    if (Number.isFinite(sizeOverride) && sizeOverride > 0) size = sizeOverride;
+    else {
+      var sz = Number(meta.size);
+      size = Number.isFinite(sz) && sz > 0 ? sz : null;
+    }
+
+    var v = meta.video && typeof meta.video === "object" ? meta.video : {};
+    var a = meta.audio && typeof meta.audio === "object" ? meta.audio : {};
+
+    var w = parseInt(String(v.display_width || v.width || ""), 10);
+    var h = parseInt(String(v.display_height || v.height || ""), 10);
+    var res = !isNaN(w) && !isNaN(h) && w > 0 && h > 0 ? w + "×" + h : "";
+
+    var vcodec = v.codec ? String(v.codec).toUpperCase() : "";
+    var acodec = a.codec ? String(a.codec).toUpperCase() : "";
+    var codecs = vcodec ? (acodec ? vcodec + "/" + acodec : vcodec) : (acodec || "");
+
+    var dur = Number(meta.duration);
+    var durText = Number.isFinite(dur) && dur > 0 ? formatDuration(dur) : "";
+
+    var fps = Number(v.fps);
+    var fpsText = Number.isFinite(fps) && fps > 0 ? String(Math.round(fps * 100) / 100) + "fps" : "";
+
+    var out = [];
+    if (size) out.push(formatBytes(size));
+    if (res) out.push(res);
+    if (codecs) out.push(codecs);
+    if (durText) out.push(durText);
+    if (fpsText) out.push(fpsText);
+    return out.length ? out.join(" • ") : "—";
+  }
+
+  function isLikelyVideoPath(path) {
+    var s = String(path || "").toLowerCase();
+    return s.endsWith(".mp4") || s.endsWith(".mov") || s.endsWith(".m4v");
+  }
+
+  function isFilesPage() {
+    var p = String((window.location && window.location.pathname) || "");
+    return p === "/files" || p.indexOf("/files/") === 0;
+  }
+
+  function getFilesListingLayout() {
+    var listing = document.getElementById("listing");
+    if (listing && listing.classList && listing.classList.contains("list")) return "list";
+    return "grid";
+  }
+
+  function getFilesDirPath() {
+    var p = String((window.location && window.location.pathname) || "");
+    if (p === "/files") return "/";
+    if (p.indexOf("/files/") !== 0) return "/";
+
+    var rest = p.substring("/files".length);
+    if (!rest) return "/";
+
+    var decoded = rest;
+    try {
+      decoded = decodeURIComponent(rest);
+    } catch (e) {
+      decoded = rest;
+    }
+    return normalizePathEncoded(decoded);
+  }
+
+  function joinPaths(dirPath, name) {
+    var d = normalizePathEncoded(dirPath);
+    var n = String(name || "").trim();
+    if (!n) return null;
+    n = n.replace(/^\/+/, "");
+
+    var combined = d === "/" ? ("/" + n) : (d + "/" + n);
+    return normalizePathEncoded(combined);
+  }
+
+  function extractFilesPathFromHref(href) {
+    var u = normalizeUrl(href);
+    if (!u) return null;
+
+    var raw = extractApiPath(u.toString(), "/files");
+    if (raw == null && u.hash) {
+      // Some routers use hash-based URLs.
+      var h = String(u.hash || "");
+      if (h.indexOf("#/files") === 0) raw = h.substring("#/files".length);
+    }
+    if (raw == null) return null;
+
+    var normalized = normalizePathEncoded(raw);
+    var decoded = normalized;
+    try {
+      decoded = decodeURIComponent(normalized);
+    } catch (e) {
+      decoded = normalized;
+    }
+    return normalizePathEncoded(decoded);
+  }
+
+  function findVideoNameElementInRow(rowEl) {
+    if (!rowEl || !rowEl.querySelectorAll) return null;
+
+    var candidates = rowEl.querySelectorAll("a, span, div, td, p");
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      if (!el || !el.textContent) continue;
+      if (el.id === VIDEO_META_INLINE_ID) continue;
+      if (el.classList && el.classList.contains(VIDEO_ROW_DETAILS_CLASS)) continue;
+      try {
+        if (el.closest && el.closest("#" + VIDEO_META_INLINE_ID)) continue;
+        if (el.closest && el.closest("." + VIDEO_ROW_DETAILS_CLASS)) continue;
+      } catch (e) {
+        // ignore
+      }
+
+      var txt = String(el.textContent || "").trim();
+      if (!txt) continue;
+      if (txt.length > 200) continue;
+      if (!isLikelyVideoPath(txt)) continue;
+      return el;
+    }
+
+    return null;
+  }
+
+  function extractVideoPathFromRow(rowEl, nameText) {
+    if (!rowEl) return null;
+
+    var anchors = rowEl.querySelectorAll ? rowEl.querySelectorAll("a[href]") : [];
+    for (var i = 0; i < anchors.length; i++) {
+      var href = anchors[i] && anchors[i].getAttribute ? anchors[i].getAttribute("href") : null;
+      var p = extractFilesPathFromHref(href);
+      if (p && isLikelyVideoPath(p)) return p;
+    }
+
+    var dir = getFilesDirPath();
+    return joinPaths(dir, nameText);
+  }
+
+  function hideFilesGridBuiltInMeta(rowEl, nameEl, detailsBox) {
+    if (!rowEl || !rowEl.querySelectorAll) return;
+
+    var nameText = "";
+    try {
+      nameText = String(nameEl && nameEl.textContent ? nameEl.textContent : "").trim();
+    } catch (eName) {
+      nameText = "";
+    }
+
+    var candidates = rowEl.querySelectorAll("p, span, div, small, time");
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      if (!el || el === nameEl) continue;
+
+      try {
+        if (detailsBox && el === detailsBox) continue;
+        if (detailsBox && el.closest && el.closest("." + VIDEO_ROW_DETAILS_CLASS)) continue;
+      } catch (eClosest) {
+        // ignore
+      }
+
+      var txt = "";
+      try {
+        txt = String(el.textContent || "").trim();
+      } catch (eTxt) {
+        txt = "";
+      }
+      if (!txt) continue;
+      if (txt.length > 80) continue;
+      if (nameText && txt.indexOf(nameText) !== -1) continue;
+
+      var lower = txt.toLowerCase();
+      var looksLikeAgo = lower.indexOf(" ago") !== -1 || lower.endsWith("ago") || lower.indexOf("yesterday") !== -1;
+      var looksLikeSize = /\b\d+(?:\.\d+)?\s*(?:b|kb|mb|gb|tb|kib|mib|gib|tib)\b/.test(lower);
+      if (!looksLikeAgo && !looksLikeSize) continue;
+
+      try {
+        if (el.style) el.style.display = "none";
+      } catch (eHide) {
+        // ignore
+      }
+    }
+  }
+
+  function ensureVideoRowDetailsBox(rowEl, nameEl) {
+    if (!rowEl || !nameEl) return null;
+
+    var layout = getFilesListingLayout();
+
+    // Grid/mosaic views: keep details *inside* the tile so it's obvious which file they belong to.
+    // (A sibling element becomes its own grid cell and looks like it belongs to the item on the left/right.)
+    if (layout !== "list") {
+      var existingInline = null;
+      try {
+        existingInline = rowEl.querySelector ? rowEl.querySelector("." + VIDEO_ROW_DETAILS_CLASS) : null;
+      } catch (eInline) {
+        existingInline = null;
+      }
+      if (existingInline) {
+        try {
+          if (nameEl && nameEl.insertAdjacentElement) {
+            nameEl.insertAdjacentElement("afterend", existingInline);
+          }
+        } catch (eMove) {
+          // ignore
+        }
+
+        hideFilesGridBuiltInMeta(rowEl, nameEl, existingInline);
+
+        return existingInline;
+      }
+
+      var inlineBox = document.createElement("div");
+      inlineBox.className = VIDEO_ROW_DETAILS_CLASS;
+      var inlineLine = document.createElement("span");
+      inlineLine.className = "line muted";
+      inlineLine.textContent = "Loading video details…";
+      inlineBox.appendChild(inlineLine);
+
+      // Allow selecting/copying without opening the file preview.
+      inlineBox.addEventListener(
+        "click",
+        function (e) {
+          try { e.preventDefault(); } catch (e1) {}
+          try { e.stopPropagation(); } catch (e2) {}
+        },
+        true
+      );
+      inlineBox.addEventListener(
+        "mousedown",
+        function (e) {
+          try { e.stopPropagation(); } catch (e3) {}
+        },
+        true
+      );
+
+      var inserted = false;
+      try {
+        if (nameEl && nameEl.insertAdjacentElement) {
+          nameEl.insertAdjacentElement("afterend", inlineBox);
+          inserted = true;
+        }
+      } catch (eInsert) {
+        inserted = false;
+      }
+
+      if (!inserted) {
+        try {
+          rowEl.appendChild(inlineBox);
+          inserted = true;
+        } catch (eApp) {
+          inserted = false;
+        }
+      }
+
+      if (inserted) hideFilesGridBuiltInMeta(rowEl, nameEl, inlineBox);
+
+      return inlineBox;
+    }
+
+    // List/table views: prefer a sibling "details row" so we're not constrained by fixed-height/flex overflow in the main row.
+    try {
+      var next = rowEl.nextElementSibling;
+      if (next && next.classList && next.classList.contains(VIDEO_DETAILS_ROW_CLASS)) {
+        var existing = next.querySelector("." + VIDEO_ROW_DETAILS_CLASS);
+        if (existing) return existing;
+      }
+    } catch (e0) {
+      // ignore
+    }
+
+    var detailsRow = null;
+    var box = document.createElement("div");
+    box.className = VIDEO_ROW_DETAILS_CLASS;
+    var line = document.createElement("span");
+    line.className = "line muted";
+    line.textContent = "Loading video details…";
+    box.appendChild(line);
+
+    var tag = String(rowEl.tagName || "").toUpperCase();
+    if (tag === "TR") {
+      detailsRow = document.createElement("tr");
+      detailsRow.className = VIDEO_DETAILS_ROW_CLASS;
+      var td = document.createElement("td");
+      td.colSpan = 100;
+      td.style.padding = "0";
+      td.style.border = "0";
+      td.appendChild(box);
+      detailsRow.appendChild(td);
+    } else {
+      detailsRow = document.createElement("div");
+      detailsRow.className = VIDEO_DETAILS_ROW_CLASS;
+      detailsRow.appendChild(box);
+    }
+
+    try {
+      rowEl.insertAdjacentElement("afterend", detailsRow);
+    } catch (e1) {
+      try {
+        (rowEl.parentNode || document.body).appendChild(detailsRow);
+      } catch (e2) {
+        return null;
+      }
+    }
+
+    return box;
+  }
+
+  function renderLinesIntoBox(box, lines) {
+    if (!box) return;
+
+    while (box.firstChild) box.removeChild(box.firstChild);
+
+    for (var i = 0; i < lines.length; i++) {
+      var info = lines[i];
+      var row = document.createElement("span");
+      row.className = "line" + (info && info.muted ? " muted" : "");
+      row.textContent = info && info.text ? info.text : "";
+      box.appendChild(row);
+    }
+  }
+
+  function getVideoMetaLines(data) {
+    var out = [];
+
+    if (data && typeof data === "object") {
+      var uploadedAt = data.uploaded_at != null ? safeToIso(data.uploaded_at) : "";
+      if (uploadedAt) out.push({ text: "Uploaded: " + uploadedAt, muted: true });
+
+      var originalSummary = renderMetaSummary(data.original, data.original_size);
+      var processedSummary = renderMetaSummary(data.processed, data.processed_size);
+
+      if (originalSummary && originalSummary !== "—") out.push({ text: "Original: " + originalSummary });
+      if (processedSummary && processedSummary !== "—") {
+        var action = data.action ? actionLabel(data.action) : "";
+        out.push({ text: "After: " + processedSummary + (action ? (" • " + action) : "") });
+      }
+
+      if (out.length === 0 && data.status) out.push({ text: "Status: " + String(data.status), muted: true });
+    }
+
+    if (out.length === 0) out.push({ text: "No video metadata recorded", muted: true });
+    return out;
+  }
+
+  function renderCompactVideoMetaLines(data) {
+    if (!data || typeof data !== "object") return [];
+
+    var original = data.original && typeof data.original === "object" ? data.original : null;
+    var processed = data.processed && typeof data.processed === "object" ? data.processed : null;
+
+    var originalSize = Number(data.original_size);
+    var processedSize = Number(data.processed_size);
+
+    var originalSummary = renderMetaSummary(original, originalSize);
+    var processedSummary = renderMetaSummary(processed, processedSize);
+
+    var origSizeText = Number.isFinite(originalSize) && originalSize > 0 ? formatBytes(originalSize) : "";
+    var procSizeText = Number.isFinite(processedSize) && processedSize > 0 ? formatBytes(processedSize) : "";
+
+    var origVideo = original && original.video && typeof original.video === "object" ? original.video : {};
+    var origAudio = original && original.audio && typeof original.audio === "object" ? original.audio : {};
+    var procVideo = processed && processed.video && typeof processed.video === "object" ? processed.video : {};
+    var procAudio = processed && processed.audio && typeof processed.audio === "object" ? processed.audio : {};
+
+    function codecPair(video, audio) {
+      var v = video && video.codec ? String(video.codec).toUpperCase() : "";
+      var a = audio && audio.codec ? String(audio.codec).toUpperCase() : "";
+      if (v) return a ? (v + "/" + a) : v;
+      return a || "";
+    }
+
+    var origCodecs = codecPair(origVideo, origAudio);
+    var procCodecs = codecPair(procVideo, procAudio);
+
+    function resolution(video) {
+      var w = parseInt(String(video && (video.display_width || video.width || "") || ""), 10);
+      var h = parseInt(String(video && (video.display_height || video.height || "") || ""), 10);
+      return !isNaN(w) && !isNaN(h) && w > 0 && h > 0 ? w + "×" + h : "";
+    }
+
+    var res = resolution(procVideo) || resolution(origVideo);
+    var dur = Number(processed && processed.duration != null ? processed.duration : (original && original.duration != null ? original.duration : NaN));
+    var durText = Number.isFinite(dur) && dur > 0 ? formatDuration(dur) : "";
+
+    var fps = Number(procVideo && procVideo.fps != null ? procVideo.fps : (origVideo && origVideo.fps != null ? origVideo.fps : NaN));
+    var fpsText = Number.isFinite(fps) && fps > 0 ? String(Math.round(fps * 100) / 100) + "fps" : "";
+
+    var sizePart = "";
+    if (origSizeText && procSizeText) {
+      sizePart = origSizeText === procSizeText ? procSizeText : (origSizeText + " → " + procSizeText);
+    } else if (procSizeText) sizePart = procSizeText;
+    else if (origSizeText) sizePart = origSizeText;
+
+    var codecPart = "";
+    if (origCodecs && procCodecs) {
+      codecPart = origCodecs === procCodecs ? procCodecs : (origCodecs + " → " + procCodecs);
+    } else codecPart = procCodecs || origCodecs;
+
+    var action = data.action ? actionLabel(data.action) : "";
+
+    var lines = [];
+
+    var pctText = "";
+    if (
+      Number.isFinite(originalSize) &&
+      originalSize > 0 &&
+      Number.isFinite(processedSize) &&
+      processedSize > 0 &&
+      originalSize !== processedSize
+    ) {
+      var pct = Math.round(((processedSize - originalSize) / originalSize) * 100);
+      if (pct !== 0) pctText = (pct > 0 ? "+" : "") + String(pct) + "%";
+    }
+
+    var primary = "";
+    if (sizePart) primary = sizePart;
+    if (pctText) primary += (primary ? " " : "") + "(" + pctText + ")";
+    if (action) primary += (primary ? " • " : "") + action;
+    if (primary) lines.push(primary);
+
+    var secondaryParts = [];
+    if (res) secondaryParts.push(res);
+    if (codecPart) secondaryParts.push(codecPart);
+    if (durText) secondaryParts.push(durText);
+    if (fpsText) secondaryParts.push(fpsText);
+    if (secondaryParts.length) lines.push(secondaryParts.join(" • "));
+
+    if (lines.length === 0) {
+      if (processedSummary && processedSummary !== "—") lines.push("After: " + processedSummary);
+      else if (originalSummary && originalSummary !== "—") lines.push("Original: " + originalSummary);
+    }
+
+    if (lines.length > 2) lines = lines.slice(0, 2);
+    return lines;
+  }
+
+  function getVideoMetaLinesCompact(data) {
+    var out = [];
+
+    if (data && typeof data === "object") {
+      var compactLines = renderCompactVideoMetaLines(data);
+      for (var i = 0; i < compactLines.length; i++) {
+        if (compactLines[i]) out.push({ text: compactLines[i] });
+      }
+
+      if (out.length === 0 && data.status) out.push({ text: "Status: " + String(data.status), muted: true });
+    }
+
+    if (out.length === 0) out.push({ text: "No video metadata recorded", muted: true });
+    if (out.length > 2) out = out.slice(0, 2);
+    return out;
+  }
+
+  function getVideoMetaLinesForItem(nameText, data, includeName) {
+    var out = [];
+    if (includeName) {
+      var n = String(nameText || "").trim();
+      if (n) out.push({ text: n, muted: true });
+    }
+    var rest = includeName ? getVideoMetaLines(data) : getVideoMetaLinesCompact(data);
+    for (var i = 0; i < rest.length; i++) out.push(rest[i]);
+    return out;
+  }
+
+  function hydrateFilesVideoRows() {
+    if (!isFilesPage()) return;
+
+    ensureVideoMetaStyles();
+
+    var layout = getFilesListingLayout();
+    var root = document.getElementById("listing") || document.getElementById("app") || document.body;
+    var rows = root && root.querySelectorAll
+      ? root.querySelectorAll(".row.list-item, .v-list-item, tr, .item, .file")
+      : document.querySelectorAll(".row.list-item, .v-list-item, tr, .item, .file");
+    var maxScanRows = 250;
+    var maxNewFetches = 8;
+    var scanned = 0;
+    var started = 0;
+    var foundVideos = 0;
+
+    for (var i = 0; i < rows.length && scanned < maxScanRows; i++) {
+      var row = rows[i];
+      scanned++;
+      if (!row || !row.querySelectorAll) continue;
+      if (row.classList && row.classList.contains(VIDEO_DETAILS_ROW_CLASS)) continue;
+
+      var nameEl = findVideoNameElementInRow(row);
+      if (!nameEl) continue;
+
+      var nameText = String(nameEl.textContent || "").trim();
+      if (!isLikelyVideoPath(nameText)) continue;
+      foundVideos++;
+
+      var itemEl = row;
+      try {
+        if (nameEl && nameEl.closest) {
+          var closest = nameEl.closest("tr, .row.list-item, .v-list-item, .item, .file");
+          if (closest) itemEl = closest;
+        }
+      } catch (eClosest) {
+        itemEl = row;
+      }
+
+      var fullPath = extractVideoPathFromRow(itemEl, nameText);
+      if (!fullPath || !isLikelyVideoPath(fullPath)) continue;
+
+      var box = ensureVideoRowDetailsBox(itemEl, nameEl);
+      if (!box) continue;
+
+      var includeName = layout === "list";
+      if (box.dataset && box.dataset.path !== fullPath) {
+        box.dataset.path = fullPath;
+        box.dataset.name = nameText;
+        box.dataset.includeName = includeName ? "1" : "";
+        box.dataset.loaded = "";
+        var initialLines = includeName
+          ? [{ text: nameText, muted: true }, { text: "Loading video details…", muted: true }]
+          : [{ text: "Loading video details…", muted: true }];
+        renderLinesIntoBox(box, initialLines);
+      }
+
+      var hasCache = Object.prototype.hasOwnProperty.call(videoMetaCache, fullPath);
+      if (hasCache) {
+        var cached = videoMetaCache[fullPath];
+        renderLinesIntoBox(box, getVideoMetaLinesForItem(nameText, cached, includeName));
+        if (box.dataset) box.dataset.loaded = "1";
+        continue;
+      }
+
+      if (videoMetaInFlight[fullPath]) {
+        continue;
+      }
+
+      if (started >= maxNewFetches) continue;
+
+      videoMetaInFlight[fullPath] = true;
+      started++;
+      (function (path, el) {
+        fetchVideoMeta(path)
+          .then(function (data) {
+            videoMetaCache[path] = (data && typeof data === "object") ? data : null;
+            if (el && el.dataset && el.dataset.path === path) {
+              renderLinesIntoBox(el, getVideoMetaLinesForItem(el.dataset.name || "", data, el.dataset.includeName === "1"));
+              el.dataset.loaded = "1";
+            }
+          })
+          .catch(function () {
+            videoMetaCache[path] = null;
+            if (el && el.dataset && el.dataset.path === path) {
+              renderLinesIntoBox(el, getVideoMetaLinesForItem(el.dataset.name || "", null, el.dataset.includeName === "1"));
+              el.dataset.loaded = "1";
+            }
+          })
+          .then(function () {
+            delete videoMetaInFlight[path];
+            scheduleFilesVideoHydrate();
+          });
+      })(fullPath, box);
+    }
+
+    if (isDropprDebugEnabled()) {
+      setDebugBadge(
+        "Droppr enhancements v" +
+          DROPPR_PANEL_VERSION +
+          " • view:" +
+          layout +
+          " • token:" +
+          (getAuthToken() ? "yes" : "no") +
+          " • ok:" +
+          videoMetaDebugStats.ok +
+          " • 404:" +
+          videoMetaDebugStats.notFound +
+          " • unauth:" +
+          videoMetaDebugStats.unauth +
+          " • rows:" +
+          rows.length +
+          " • scanned:" +
+          scanned +
+          " • videos:" +
+          foundVideos +
+          " • fetches:" +
+          started
+      );
+    }
+  }
+
+  function scheduleFilesVideoHydrate() {
+    if (!isFilesPage()) return;
+
+    if (filesVideoHydrateTimer) {
+      clearTimeout(filesVideoHydrateTimer);
+      filesVideoHydrateTimer = null;
+    }
+
+    filesVideoHydrateTimer = setTimeout(function () {
+      filesVideoHydrateTimer = null;
+      hydrateFilesVideoRows();
+    }, 250);
+  }
+
+  function shouldShowVideoMetaPanel(path) {
+    return !(videoMetaDismissedPath && path === videoMetaDismissedPath);
+  }
+
+  function findActiveVideoElement() {
+    var sourceEl = document.querySelector('video source[src*=\"/api/raw/\"]');
+    if (sourceEl && sourceEl.parentElement && sourceEl.parentElement.tagName === "VIDEO") return sourceEl.parentElement;
+    var videoEl = document.querySelector('video[src*=\"/api/raw/\"]');
+    return videoEl || null;
+  }
+
+  function ensureVideoMetaInlineBox(videoEl) {
+    if (!videoEl) return null;
+    if (!isFilesPage()) return null;
+    ensureVideoMetaStyles();
+
+    try {
+      var existing = videoEl.parentNode ? videoEl.parentNode.querySelector("#" + VIDEO_META_INLINE_ID) : null;
+      if (existing) return existing;
+    } catch (e) {
+      // ignore
+    }
+
+    var globalExisting = document.getElementById(VIDEO_META_INLINE_ID);
+    if (globalExisting && globalExisting.parentNode) {
+      try {
+        globalExisting.parentNode.removeChild(globalExisting);
+      } catch (e2) {
+        // ignore
+      }
+    }
+
+    var box = document.createElement("div");
+    box.id = VIDEO_META_INLINE_ID;
+
+    var span = document.createElement("span");
+    span.className = "line muted";
+    span.textContent = "Loading video details…";
+    box.appendChild(span);
+
+    try {
+      videoEl.insertAdjacentElement("afterend", box);
+    } catch (e3) {
+      try {
+        (videoEl.parentNode || document.body).appendChild(box);
+      } catch (e4) {
+        return null;
+      }
+    }
+
+    return box;
+  }
+
+  function updateVideoMetaInline(path, data) {
+    if (!isFilesPage()) return;
+
+    var videoEl = findActiveVideoElement();
+    if (!videoEl) return;
+
+    var box = ensureVideoMetaInlineBox(videoEl);
+    if (!box) return;
+
+    while (box.firstChild) box.removeChild(box.firstChild);
+
+    var lines = [];
+    if (data && typeof data === "object") {
+      var uploadedAt = data.uploaded_at != null ? safeToIso(data.uploaded_at) : "";
+      var status = data.status != null ? String(data.status) : "";
+
+      if (uploadedAt) lines.push("Uploaded: " + uploadedAt);
+      else if (status) lines.push("Status: " + status);
+
+      var originalSummary = renderMetaSummary(data.original, data.original_size);
+      var processedSummary = renderMetaSummary(data.processed, data.processed_size);
+
+      if (originalSummary && originalSummary !== "—") lines.push("Original: " + originalSummary);
+      if (processedSummary && processedSummary !== "—") {
+        var action = data.action ? actionLabel(data.action) : "";
+        lines.push("After: " + processedSummary + (action ? (" • " + action) : ""));
+      }
+
+      if (lines.length === 0 && status) lines.push("Status: " + status);
+    }
+
+    if (lines.length === 0) lines.push("Video details unavailable");
+
+    for (var i = 0; i < lines.length; i++) {
+      var row = document.createElement("span");
+      row.className = "line" + (i === 0 && lines[i].indexOf("Status:") === 0 ? " muted" : "");
+      row.textContent = lines[i];
+      box.appendChild(row);
+    }
+  }
+
+  function fetchVideoMeta(path) {
+    var token = getAuthToken();
+
+    var opts = { cache: "no-store", credentials: "same-origin" };
+    if (token) opts.headers = { "X-Auth": token };
+
+    return fetch("/api/droppr/video-meta?path=" + encodeURIComponent(path), opts)
+      .then(function (res) {
+        if (isDropprDebugEnabled() && res) {
+          if (res.status === 200) videoMetaDebugStats.ok++;
+          else if (res.status === 404) videoMetaDebugStats.notFound++;
+          else if (res.status === 401 || res.status === 403) videoMetaDebugStats.unauth++;
+          else videoMetaDebugStats.other++;
+        }
+        if (!res || !res.ok) return null;
+        return res.json().catch(function () {
+          return null;
+        });
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function updateVideoMetaPanel(path, data) {
+    var panel = ensureVideoMetaPanel();
+    if (!panel) return;
+
+    var name = String(path || "").split("/").pop() || String(path || "");
+    var status = (data && data.status) ? String(data.status) : "—";
+    var action = data && data.action ? actionLabel(data.action) : "—";
+
+    var uploadedAt = data && data.uploaded_at != null ? safeToIso(data.uploaded_at) : "";
+    var processedAt = data && data.processed_at != null ? safeToIso(data.processed_at) : "";
+    var originalSummary = data ? renderMetaSummary(data.original, data.original_size) : "—";
+    var processedSummary = data ? renderMetaSummary(data.processed, data.processed_size) : "—";
+
+    panel.querySelector("#droppr-video-meta-path").textContent = name + "  •  " + path;
+    panel.querySelector("#droppr-video-meta-status").textContent = status;
+    panel.querySelector("#droppr-video-meta-uploaded").textContent = uploadedAt || "—";
+    panel.querySelector("#droppr-video-meta-processed-at").textContent = processedAt || "—";
+    panel.querySelector("#droppr-video-meta-original").textContent = originalSummary;
+    panel.querySelector("#droppr-video-meta-processed").textContent = processedSummary;
+    panel.querySelector("#droppr-video-meta-action").textContent = action;
+
+    panel.style.display = "block";
+  }
+
+  function showVideoMetaForPath(path) {
+    if (!path || !isLikelyVideoPath(path)) return;
+
+    videoMetaActivePath = path;
+    var cached = videoMetaCache[path];
+    if (cached) {
+      if (shouldShowVideoMetaPanel(path)) updateVideoMetaPanel(path, cached);
+      updateVideoMetaInline(path, cached);
+      return;
+    }
+
+    var loading = { status: "loading", action: "", uploaded_at: null, original: null, processed: null };
+    if (shouldShowVideoMetaPanel(path)) updateVideoMetaPanel(path, loading);
+    updateVideoMetaInline(path, loading);
+    fetchVideoMeta(path).then(function (data) {
+      if (!data || typeof data !== "object") return;
+      videoMetaCache[path] = data;
+      if (videoMetaActivePath === path) {
+        if (shouldShowVideoMetaPanel(path)) updateVideoMetaPanel(path, data);
+        updateVideoMetaInline(path, data);
+      }
+    });
+  }
+
+  function findActiveVideoRawSrc() {
+    var sourceEl = document.querySelector('video source[src*=\"/api/raw/\"]');
+    if (sourceEl && sourceEl.getAttribute) return sourceEl.getAttribute("src");
+    var videoEl = document.querySelector('video[src*=\"/api/raw/\"]');
+    if (videoEl && videoEl.getAttribute) return videoEl.getAttribute("src");
+    return null;
+  }
+
+  function startVideoMetaWatcher() {
+    if (videoMetaPollTimer) return;
+
+    var lastSeenPath = null;
+    videoMetaPollTimer = setInterval(function () {
+      var src = findActiveVideoRawSrc();
+      if (!src) {
+        lastSeenPath = null;
+        return;
+      }
+
+      var rawPath = extractApiPath(src, "/api/raw");
+      if (rawPath == null) return;
+
+      var normalized = normalizePathEncoded(rawPath);
+      var decoded = normalized;
+      try {
+        decoded = decodeURIComponent(normalized);
+      } catch (e) {
+        decoded = normalized;
+      }
+
+      decoded = normalizePathEncoded(decoded);
+      if (!isLikelyVideoPath(decoded)) return;
+
+      if (lastSeenPath !== decoded) {
+        videoMetaDismissedPath = null;
+        lastSeenPath = decoded;
+      }
+
+      if (decoded !== videoMetaActivePath) {
+        showVideoMetaForPath(decoded);
+        return;
+      }
+
+      var cached = videoMetaCache[decoded];
+      if (cached) {
+        updateVideoMetaInline(decoded, cached);
+        if (shouldShowVideoMetaPanel(decoded)) updateVideoMetaPanel(decoded, cached);
+      } else {
+        showVideoMetaForPath(decoded);
+      }
+
+      // Keep /files list decorations up to date (SPA navigations + virtualized rows).
+      if (isFilesPage()) {
+        if (filesVideoLastPathname !== String(window.location && window.location.pathname)) {
+          filesVideoLastPathname = String(window.location && window.location.pathname);
+          scheduleFilesVideoHydrate();
+        }
+      }
+    }, 1000);
   }
 
   function ensureShareExpireStyles() {
@@ -1687,11 +2783,24 @@
     patchFileInputs();
     ensureAnalyticsButton();
     ensureShareExpireButtons();
+    startVideoMetaWatcher();
+    scheduleFilesVideoHydrate();
     var observer = new MutationObserver(function () {
       ensureAnalyticsButton();
       ensureShareExpireButtons();
+      scheduleFilesVideoHydrate();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    filesVideoLastPathname = String(window.location && window.location.pathname);
+    setInterval(function () {
+      if (!isFilesPage()) return;
+      var cur = String(window.location && window.location.pathname);
+      if (cur !== filesVideoLastPathname) {
+        filesVideoLastPathname = cur;
+        scheduleFilesVideoHydrate();
+      }
+    }, 500);
   }
 
   if (document.readyState === "loading") {

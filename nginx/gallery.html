@@ -288,12 +288,33 @@
         }
 
         .media-title {
+            min-width: 0;
+        }
+
+        .media-name {
             font-weight: 600;
             margin-bottom: 0.25rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             color: var(--text-primary);
+        }
+
+        .video-details {
+            display: none;
+            margin-top: 0.35rem;
+            font-size: 0.75rem;
+            line-height: 1.25;
+            color: var(--text-secondary);
+            word-break: break-word;
+        }
+
+        body.show-details .video-details {
+            display: block;
+        }
+
+        .video-details .line {
+            display: block;
         }
 
         .media-meta {
@@ -955,6 +976,7 @@
                 <button id="listViewBtn" title="List view" aria-label="List view">☰</button>
             </div>
 
+            <button class="action-btn secondary" id="detailsBtn" title="Toggle video details">ℹ Details</button>
             <button class="action-btn secondary" id="copyLinkBtn">🔗 Share</button>
             <button class="action-btn secondary" id="refreshBtn" title="Refresh. Shift+click = hard reload">🔄 Refresh</button>
             <a href="#" id="downloadAllBtn" class="action-btn">⬇️ Download All</a>
@@ -1068,6 +1090,7 @@
             filter: 'all',
             sort: 'type_asc',
             layout: 'grid',
+            showDetails: true,
             search: '',
             isSlideshow: false,
             slideshowInterval: null,
@@ -1082,7 +1105,9 @@
 	                stall: null
 	            },
 	            videoStatusInterval: null,
-	            scrollLockY: 0
+	            scrollLockY: 0,
+	            videoMetaCache: {},
+	            videoMetaInFlight: {}
 	        };
 
         // ============ DOM ELEMENTS ============
@@ -1107,6 +1132,7 @@
             els.downloadAll = document.getElementById('downloadAllBtn');
             els.copyLink = document.getElementById('copyLinkBtn');
             els.refresh = document.getElementById('refreshBtn');
+            els.details = document.getElementById('detailsBtn');
             els.backToTop = document.getElementById('backToTop');
             els.viewOriginal = document.getElementById('viewOriginalBtn');
             els.download = document.getElementById('downloadBtn');
@@ -1143,6 +1169,165 @@
             const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(b) / Math.log(k));
             return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+        }
+
+        function formatDuration(seconds) {
+            const s = Number(seconds);
+            if (!Number.isFinite(s) || s <= 0) return '';
+            const total = Math.floor(s);
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const sec = total % 60;
+            if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            return `${m}:${String(sec).padStart(2, '0')}`;
+        }
+
+        function formatUnixSeconds(tsSeconds) {
+            if (tsSeconds == null) return '';
+            const n = parseInt(String(tsSeconds), 10);
+            if (!Number.isFinite(n) || n <= 0) return '';
+            try {
+                return new Date(n * 1000).toLocaleString();
+            } catch {
+                return '';
+            }
+        }
+
+        function actionLabel(action) {
+            const a = String(action || '').toLowerCase();
+            if (a === 'transcode_hevc_to_h264') return 'Transcoded HEVC → H.264';
+            if (a === 'fix_video_errors_extra_streams') return 'Re-encoded (removed extra streams)';
+            if (a === 'fix_video_errors_timestamp') return 'Re-encoded (fixed timestamps)';
+            if (a === 'faststart') return 'Faststart (moov moved)';
+            if (a === 'already_faststart') return 'Already faststart';
+            if (a === 'none') return 'No changes';
+            return action ? String(action) : '';
+        }
+
+        function formatVideoSummary(meta, sizeOverride) {
+            if (!meta || typeof meta !== 'object') {
+                const s = Number(sizeOverride);
+                return Number.isFinite(s) && s > 0 ? formatSize(s) : '—';
+            }
+
+            const v = (meta.video && typeof meta.video === 'object') ? meta.video : {};
+            const a = (meta.audio && typeof meta.audio === 'object') ? meta.audio : {};
+
+            let size = null;
+            if (Number.isFinite(Number(sizeOverride)) && Number(sizeOverride) > 0) size = Number(sizeOverride);
+            else if (Number.isFinite(Number(meta.size)) && Number(meta.size) > 0) size = Number(meta.size);
+
+            const w = parseInt(String(v.display_width || v.width || ''), 10);
+            const h = parseInt(String(v.display_height || v.height || ''), 10);
+            const res = (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) ? `${w}×${h}` : '';
+
+            const vCodec = v.codec ? String(v.codec).toUpperCase() : '';
+            const aCodec = a.codec ? String(a.codec).toUpperCase() : '';
+            const codecs = vCodec ? (aCodec ? `${vCodec}/${aCodec}` : vCodec) : (aCodec || '');
+
+            const dur = formatDuration(meta.duration);
+            const fpsNum = Number(v.fps);
+            const fps = Number.isFinite(fpsNum) && fpsNum > 0 ? `${Math.round(fpsNum * 100) / 100}fps` : '';
+
+            return [
+                size ? formatSize(size) : '',
+                res,
+                codecs,
+                dur,
+                fps,
+            ].filter(Boolean).join(' • ') || '—';
+        }
+
+        function updateDetailsButton() {
+            if (!els.details) return;
+            els.details.textContent = state.showDetails ? 'ℹ Details: On' : 'ℹ Details: Off';
+        }
+
+        function setDetailsEnabled(enabled, opts = {}) {
+            const on = !!enabled;
+            state.showDetails = on;
+            document.body.classList.toggle('show-details', on);
+            updateDetailsButton();
+            if (!opts.skipSave) savePrefs({ show_details: on });
+            if (on) hydrateVideoDetails();
+        }
+
+        async function fetchVideoMeta(path) {
+            const url = `/api/share/${state.shareHash}/video-meta/${encodePath(path)}?t=${Date.now()}`;
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+
+        function renderVideoDetails(el, data) {
+            if (!el) return;
+            if (!data || typeof data !== 'object') {
+                el.innerHTML = '<span class="line">Details unavailable</span>';
+                el.dataset.loaded = '1';
+                return;
+            }
+
+            const lines = [];
+
+            if (data.recorded) {
+                const uploaded = formatUnixSeconds(data.uploaded_at);
+                if (uploaded) lines.push(`Uploaded: ${uploaded}`);
+
+                const original = formatVideoSummary(data.original, data.original_size);
+                const processed = formatVideoSummary(data.processed, data.processed_size);
+                lines.push(`Original: ${original}`);
+
+                const action = actionLabel(data.action);
+                lines.push(`After: ${processed}${action ? ` • ${action}` : ''}`);
+            } else {
+                const cur = data.current && data.current.size ? formatSize(data.current.size) : '';
+                lines.push(cur ? `Size: ${cur}` : 'No video metadata recorded yet');
+            }
+
+            el.innerHTML = lines.map(l => `<span class="line">${l}</span>`).join('');
+            el.dataset.loaded = '1';
+        }
+
+        async function hydrateVideoDetails() {
+            if (!state.showDetails) return;
+
+            const nodes = Array.from(document.querySelectorAll('.video-details[data-video-meta="1"]'));
+            const pending = nodes.filter(el => el && !el.dataset.loaded && el.dataset.path);
+            if (!pending.length) return;
+
+            let idx = 0;
+            const maxWorkers = Math.min(4, pending.length);
+
+            async function worker() {
+                while (idx < pending.length) {
+                    const el = pending[idx++];
+                    const enc = String(el.dataset.path || '');
+                    let path = enc;
+                    try { path = decodeURIComponent(enc); } catch {}
+
+                    const key = `${state.shareHash}:${path}`;
+                    if (state.videoMetaCache[key]) {
+                        renderVideoDetails(el, state.videoMetaCache[key]);
+                        continue;
+                    }
+
+                    if (state.videoMetaInFlight[key]) continue;
+                    state.videoMetaInFlight[key] = true;
+                    try {
+                        const data = await fetchVideoMeta(path);
+                        if (data) state.videoMetaCache[key] = data;
+                        renderVideoDetails(el, data);
+                    } catch (e) {
+                        renderVideoDetails(el, null);
+                    } finally {
+                        delete state.videoMetaInFlight[key];
+                    }
+                }
+            }
+
+            const workers = [];
+            for (let i = 0; i < maxWorkers; i++) workers.push(worker());
+            await Promise.all(workers);
         }
 
         function showToast(msg) {
@@ -1683,6 +1868,10 @@
                 card.innerHTML = createCardHTML(file, index);
                 els.grid.appendChild(card);
             });
+
+            if (state.showDetails) {
+                hydrateVideoDetails().catch(() => {});
+            }
         }
 
         function createCardHTML(file, index) {
@@ -1719,7 +1908,10 @@
                     ${preview}
                 </div>
                 <div class="media-info">
-                    <div class="media-title">${file.name}</div>
+                    <div class="media-title">
+                        <div class="media-name">${file.name}</div>
+                        ${isVideo ? `<div class="video-details" data-video-meta="1" data-path="${encodeURIComponent(path)}">Loading…</div>` : ''}
+                    </div>
                     <div class="media-meta"><span>${file.extension.toUpperCase()}</span><span>${formatSize(file.size)}</span></div>
                     <div class="card-actions">
                         <button class="card-btn primary" onclick="openMedia(${index}, event)">${isVideo ? 'Play' : 'View'}</button>
@@ -1805,6 +1997,11 @@
                     fetchFiles(true).catch(console.error);
                 }
             };
+
+            // Details toggle
+            if (els.details) {
+                els.details.onclick = () => setDetailsEnabled(!state.showDetails);
+            }
 
             // Modal controls
             document.getElementById('closeBtn').onclick = closeModal;
@@ -1986,6 +2183,7 @@
             const prefs = loadPrefs();
             state.filter = prefs.filter || 'all';
             state.sort = prefs.sort || 'type_asc';
+            state.showDetails = prefs.show_details !== undefined ? !!prefs.show_details : true;
             const isSmallScreen = window.matchMedia?.('(max-width: 900px)')?.matches;
             state.layout = prefs.layout || ((IS_IOS || isSmallScreen) ? 'list' : 'grid');
 
@@ -2001,6 +2199,8 @@
                 document.getElementById('listViewBtn').classList.add('active');
                 document.getElementById('gridViewBtn').classList.remove('active');
             }
+
+            setDetailsEnabled(state.showDetails, { skipSave: true });
 
             // Setup handlers
             setupEventHandlers();

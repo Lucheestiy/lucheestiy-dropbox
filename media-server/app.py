@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import fcntl
 import ipaddress
+import json
 import os
 import re
 import sqlite3
@@ -84,6 +85,28 @@ def _safe_rel_path(value: str) -> str | None:
     return "/".join(parts)
 
 
+def _safe_root_path(value: str) -> str | None:
+    if value is None:
+        return None
+
+    value = str(value).strip()
+    if not value:
+        return None
+    if "\\" in value:
+        return None
+
+    if not value.startswith("/"):
+        value = "/" + value
+
+    value = re.sub(r"/+", "/", value)
+    parts = [p for p in value.split("/") if p]
+    if not parts:
+        return "/"
+    if any(p == ".." for p in parts):
+        return None
+    return "/" + "/".join(parts)
+
+
 def _encode_share_path(value: str) -> str | None:
     if value is None:
         return None
@@ -136,9 +159,13 @@ ANALYTICS_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ANALYTICS_DB_TIMEOUT
 ALIASES_DB_PATH = os.environ.get("DROPPR_ALIASES_DB_PATH", "/database/droppr-aliases.sqlite3")
 ALIASES_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ALIASES_DB_TIMEOUT_SECONDS", "30"))
 
+VIDEO_META_DB_PATH = os.environ.get("DROPPR_VIDEO_META_DB_PATH", "/database/droppr-video-meta.sqlite3")
+VIDEO_META_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_VIDEO_META_DB_TIMEOUT_SECONDS", "10"))
+
 _last_retention_sweep_at: float = 0.0
 _analytics_db_ready: bool = False
 _aliases_db_ready: bool = False
+_video_meta_db_ready: bool = False
 
 
 def _get_client_ip() -> str | None:
@@ -372,6 +399,98 @@ def _ensure_aliases_db() -> None:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
         finally:
             lock_file.close()
+
+
+def _init_video_meta_db() -> None:
+    db_dir = os.path.dirname(VIDEO_META_DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    conn = sqlite3.connect(
+        VIDEO_META_DB_PATH,
+        timeout=VIDEO_META_DB_TIMEOUT_SECONDS,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS video_meta (
+                path TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                action TEXT,
+                error TEXT,
+                uploaded_at INTEGER,
+                processed_at INTEGER,
+                original_size INTEGER,
+                processed_size INTEGER,
+                original_meta_json TEXT,
+                processed_meta_json TEXT
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_video_meta_status ON video_meta(status)")
+    finally:
+        conn.close()
+
+
+def _ensure_video_meta_db() -> None:
+    global _video_meta_db_ready
+
+    if _video_meta_db_ready:
+        return
+
+    db_dir = os.path.dirname(VIDEO_META_DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    lock_path = f"{VIDEO_META_DB_PATH}.init.lock"
+    lock_file = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+
+        for attempt in range(10):
+            try:
+                _init_video_meta_db()
+                _video_meta_db_ready = True
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < 9:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                app.logger.warning("Video meta init failed: %s", e)
+                return
+            except Exception as e:
+                app.logger.warning("Video meta init failed: %s", e)
+                return
+    finally:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        finally:
+            lock_file.close()
+
+
+@contextmanager
+def _video_meta_conn():
+    _ensure_video_meta_db()
+
+    conn = sqlite3.connect(
+        VIDEO_META_DB_PATH,
+        timeout=VIDEO_META_DB_TIMEOUT_SECONDS,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 MAX_ALIAS_DEPTH = 10
@@ -872,14 +991,16 @@ def _ffmpeg_thumbnail_cmd(*, src_url: str, dst_path: str, seek_seconds: int | No
     return cmd
 
 
-def _proxy_cache_key(*, share_hash: str, file_path: str, size: int) -> str:
-    # Cache key is stable across requests and invalidates when the source size or encoding profile changes.
-    key = f"proxy:{PROXY_PROFILE_VERSION}:{PROXY_MAX_DIMENSION}:{PROXY_CRF}:{PROXY_H264_PRESET}:{share_hash}:{file_path}:{size}"
+def _proxy_cache_key(*, share_hash: str, file_path: str, size: int, modified: str | None = None) -> str:
+    # Cache key is stable across requests and invalidates when the source changes or encoding profile changes.
+    mod = (modified or "").strip()
+    key = f"proxy:{PROXY_PROFILE_VERSION}:{PROXY_MAX_DIMENSION}:{PROXY_CRF}:{PROXY_H264_PRESET}:{share_hash}:{file_path}:{size}:{mod}"
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def _hd_cache_key(*, share_hash: str, file_path: str, size: int) -> str:
-    key = f"hd:{HD_PROFILE_VERSION}:{HD_MAX_DIMENSION}:{HD_CRF}:{HD_H264_PRESET}:{share_hash}:{file_path}:{size}"
+def _hd_cache_key(*, share_hash: str, file_path: str, size: int, modified: str | None = None) -> str:
+    mod = (modified or "").strip()
+    key = f"hd:{HD_PROFILE_VERSION}:{HD_MAX_DIMENSION}:{HD_CRF}:{HD_H264_PRESET}:{share_hash}:{file_path}:{size}:{mod}"
     return hashlib.sha256(key.encode()).hexdigest()
 
 
@@ -932,8 +1053,14 @@ def _ffmpeg_proxy_cmd(*, src_url: str, dst_path: str) -> list[str]:
     ]
 
 
-def _ensure_fast_proxy_mp4(*, share_hash: str, file_path: str, size: int) -> tuple[str, str, str, int | None]:
-    cache_key = _proxy_cache_key(share_hash=share_hash, file_path=file_path, size=size)
+def _ensure_fast_proxy_mp4(
+    *,
+    share_hash: str,
+    file_path: str,
+    size: int,
+    modified: str | None = None,
+) -> tuple[str, str, str, int | None]:
+    cache_key = _proxy_cache_key(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
     output_path = os.path.join(PROXY_CACHE_DIR, f"{cache_key}.mp4")
     public_url = f"/api/proxy-cache/{cache_key}.mp4"
 
@@ -1087,8 +1214,14 @@ def _ffmpeg_hd_transcode_cmd(*, src_url: str, dst_path: str) -> list[str]:
     return cmd
 
 
-def _ensure_hd_mp4(*, share_hash: str, file_path: str, size: int) -> tuple[str, str, str, int | None]:
-    cache_key = _hd_cache_key(share_hash=share_hash, file_path=file_path, size=size)
+def _ensure_hd_mp4(
+    *,
+    share_hash: str,
+    file_path: str,
+    size: int,
+    modified: str | None = None,
+) -> tuple[str, str, str, int | None]:
+    cache_key = _hd_cache_key(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
     output_path = os.path.join(PROXY_CACHE_DIR, f"{cache_key}.mp4")
     public_url = f"/api/proxy-cache/{cache_key}.mp4"
 
@@ -1262,22 +1395,24 @@ def serve_proxy(share_hash: str, filename: str):
     if ext not in VIDEO_EXTS:
         return "Unsupported proxy type", 415
 
-    # Resolve file size to get a stable cache key (and invalidate on overwrite).
-    files = (
-        _get_share_files(share_hash, source_hash=source_hash, force_refresh=False, max_age_seconds=DEFAULT_CACHE_TTL_SECONDS)
-        or []
-    )
-    match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
-    if not match:
-        files = _get_share_files(share_hash, source_hash=source_hash, force_refresh=True, max_age_seconds=0) or []
-        match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
-
-    if not match:
+    meta = _fetch_public_share_json(source_hash, subpath="/" + safe)
+    if not meta:
         return "File not found", 404
+    if isinstance(meta.get("items"), list) or parse_bool(meta.get("isDir")):
+        return "File not found", 404
+
+    name = meta.get("name") if isinstance(meta.get("name"), str) else None
+    meta_path = meta.get("path") if isinstance(meta.get("path"), str) else None
+    # For single-file shares, FileBrowser ignores the subpath. Enforce name match.
+    if (not meta_path or not meta_path.startswith("/")) and name and safe != name:
+        return "File not found", 404
+
+    size = int(meta.get("size") or 0)
+    modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
 
     try:
         _, _, public_url, _ = _ensure_fast_proxy_mp4(
-            share_hash=source_hash, file_path=safe, size=int(match.get("size") or 0)
+            share_hash=source_hash, file_path=safe, size=size, modified=modified
         )
         return redirect(public_url, code=302)
     except subprocess.TimeoutExpired:
@@ -1306,29 +1441,31 @@ def video_sources(share_hash: str, filename: str):
     if ext not in VIDEO_EXTS:
         return jsonify({"error": "Unsupported video type"}), 415
 
-    files = (
-        _get_share_files(share_hash, source_hash=source_hash, force_refresh=False, max_age_seconds=DEFAULT_CACHE_TTL_SECONDS)
-        or []
-    )
-    match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
-    if not match:
-        files = _get_share_files(share_hash, source_hash=source_hash, force_refresh=True, max_age_seconds=0) or []
-        match = next((f for f in files if isinstance(f, dict) and f.get("path") == safe), None)
-
-    if not match:
+    meta = _fetch_public_share_json(source_hash, subpath="/" + safe)
+    if not meta or isinstance(meta.get("items"), list) or parse_bool(meta.get("isDir")):
         return jsonify({"error": "File not found"}), 404
 
-    original_url = match.get("inline_url")
-    original_size = int(match.get("size") or 0)
+    name = meta.get("name") if isinstance(meta.get("name"), str) else None
+    meta_path = meta.get("path") if isinstance(meta.get("path"), str) else None
+    if (not meta_path or not meta_path.startswith("/")) and name and safe != name:
+        return jsonify({"error": "File not found"}), 404
 
-    proxy_key = _proxy_cache_key(share_hash=source_hash, file_path=safe, size=original_size)
+    original_size = int(meta.get("size") or 0)
+    modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
+
+    if meta_path and meta_path.startswith("/"):
+        original_url = f"/api/public/dl/{source_hash}/{quote(safe, safe='/')}?inline=true"
+    else:
+        original_url = f"/api/public/file/{source_hash}?inline=true"
+
+    proxy_key = _proxy_cache_key(share_hash=source_hash, file_path=safe, size=original_size, modified=modified)
     proxy_path = os.path.join(PROXY_CACHE_DIR, f"{proxy_key}.mp4")
     proxy_url = f"/api/proxy-cache/{proxy_key}.mp4"
 
     proxy_ready = os.path.exists(proxy_path)
     proxy_size = os.path.getsize(proxy_path) if proxy_ready else None
 
-    hd_key = _hd_cache_key(share_hash=source_hash, file_path=safe, size=original_size)
+    hd_key = _hd_cache_key(share_hash=source_hash, file_path=safe, size=original_size, modified=modified)
     hd_path = os.path.join(PROXY_CACHE_DIR, f"{hd_key}.mp4")
     hd_url = f"/api/proxy-cache/{hd_key}.mp4"
     hd_ready = os.path.exists(hd_path)
@@ -1362,6 +1499,7 @@ def video_sources(share_hash: str, filename: str):
             share_hash=source_hash,
             file_path=safe,
             size=original_size,
+            modified=modified,
         )
 
     if "hd" in prepare_targets and not hd_ready:
@@ -1371,6 +1509,7 @@ def video_sources(share_hash: str, filename: str):
             share_hash=source_hash,
             file_path=safe,
             size=original_size,
+            modified=modified,
         )
 
     resp = jsonify(
@@ -1395,6 +1534,110 @@ def video_sources(share_hash: str, filename: str):
                 "requested": sorted(prepare_targets) if prepare_targets else [],
                 "started": prepare_started,
             },
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/share/<share_hash>/video-meta/<path:filename>")
+def share_video_meta(share_hash: str, filename: str):
+    if not is_valid_share_hash(share_hash):
+        return jsonify({"error": "Invalid share hash"}), 400
+
+    source_hash = _resolve_share_hash(share_hash)
+
+    filename = filename or ""
+    safe = _safe_rel_path(filename)
+    if not safe:
+        return jsonify({"error": "Invalid filename"}), 400
+
+    ext = os.path.splitext(safe)[1].lstrip(".").lower()
+    if ext not in VIDEO_EXTS:
+        return jsonify({"error": "Unsupported video type"}), 415
+
+    meta = _fetch_public_share_json(source_hash, subpath="/" + safe)
+    if not meta or isinstance(meta.get("items"), list) or parse_bool(meta.get("isDir")):
+        return jsonify({"error": "File not found"}), 404
+
+    name = meta.get("name") if isinstance(meta.get("name"), str) else None
+    meta_path = meta.get("path") if isinstance(meta.get("path"), str) else None
+    if (not meta_path or not meta_path.startswith("/")) and name and safe != name:
+        return jsonify({"error": "File not found"}), 404
+
+    current_size = int(meta.get("size") or 0) or None
+    current_modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
+
+    db_path = "/" + safe.lstrip("/")
+    row = None
+    try:
+        with _video_meta_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    path,
+                    status,
+                    action,
+                    error,
+                    uploaded_at,
+                    processed_at,
+                    original_size,
+                    processed_size,
+                    original_meta_json,
+                    processed_meta_json
+                FROM video_meta
+                WHERE path = ?
+                LIMIT 1
+                """,
+                (db_path,),
+            ).fetchone()
+    except Exception as e:
+        app.logger.error("Failed to read video meta for %s: %s", db_path, e)
+        return jsonify({"error": "Failed to read video metadata"}), 500
+
+    if not row:
+        resp = jsonify(
+            {
+                "share": share_hash,
+                "path": safe,
+                "name": name or os.path.basename(safe),
+                "current": {"size": current_size, "modified": current_modified},
+                "recorded": False,
+            }
+        )
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    original_meta = None
+    processed_meta = None
+    try:
+        if row["original_meta_json"]:
+            original_meta = json.loads(row["original_meta_json"])
+    except Exception:
+        original_meta = None
+
+    try:
+        if row["processed_meta_json"]:
+            processed_meta = json.loads(row["processed_meta_json"])
+    except Exception:
+        processed_meta = None
+
+    resp = jsonify(
+        {
+            "share": share_hash,
+            "path": safe,
+            "name": name or os.path.basename(safe),
+            "current": {"size": current_size, "modified": current_modified},
+            "recorded": True,
+            "status": str(row["status"]),
+            "action": (str(row["action"]) if row["action"] is not None else None),
+            "error": (str(row["error"]) if row["error"] is not None else None),
+            "uploaded_at": int(row["uploaded_at"] or 0) if row["uploaded_at"] else None,
+            "processed_at": int(row["processed_at"] or 0) if row["processed_at"] else None,
+            "original_size": int(row["original_size"] or 0) if row["original_size"] else None,
+            "processed_size": int(row["processed_size"] or 0) if row["processed_size"] else None,
+            "original": original_meta,
+            "processed": processed_meta,
         }
     )
     resp.headers["Cache-Control"] = "no-store"
@@ -1542,6 +1785,85 @@ def droppr_list_share_aliases():
         return jsonify({"error": "Failed to list share aliases"}), 500
 
     resp = jsonify({"aliases": aliases})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/droppr/video-meta")
+def droppr_video_meta():
+    token = _get_auth_token()
+    if not token:
+        return jsonify({"error": "Missing auth token"}), 401
+
+    try:
+        status = _validate_filebrowser_admin(token)
+    except Exception as e:
+        return jsonify({"error": f"Failed to validate auth: {e}"}), 502
+
+    if status is not None:
+        return jsonify({"error": "Unauthorized"}), status
+
+    raw_path = request.args.get("path") or request.args.get("p")
+    safe_path = _safe_root_path(raw_path)
+    if not safe_path or safe_path == "/":
+        return jsonify({"error": "Missing or invalid path"}), 400
+
+    try:
+        with _video_meta_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    path,
+                    status,
+                    action,
+                    error,
+                    uploaded_at,
+                    processed_at,
+                    original_size,
+                    processed_size,
+                    original_meta_json,
+                    processed_meta_json
+                FROM video_meta
+                WHERE path = ?
+                LIMIT 1
+                """,
+                (safe_path,),
+            ).fetchone()
+    except Exception as e:
+        app.logger.error("Failed to read video meta for %s: %s", safe_path, e)
+        return jsonify({"error": "Failed to read video metadata"}), 500
+
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+
+    original_meta = None
+    processed_meta = None
+    try:
+        if row["original_meta_json"]:
+            original_meta = json.loads(row["original_meta_json"])
+    except Exception:
+        original_meta = None
+
+    try:
+        if row["processed_meta_json"]:
+            processed_meta = json.loads(row["processed_meta_json"])
+    except Exception:
+        processed_meta = None
+
+    resp = jsonify(
+        {
+            "path": str(row["path"]),
+            "status": str(row["status"]),
+            "action": (str(row["action"]) if row["action"] is not None else None),
+            "error": (str(row["error"]) if row["error"] is not None else None),
+            "uploaded_at": int(row["uploaded_at"] or 0) if row["uploaded_at"] else None,
+            "processed_at": int(row["processed_at"] or 0) if row["processed_at"] else None,
+            "original_size": int(row["original_size"] or 0) if row["original_size"] else None,
+            "processed_size": int(row["processed_size"] or 0) if row["processed_size"] else None,
+            "original": original_meta,
+            "processed": processed_meta,
+        }
+    )
     resp.headers["Cache-Control"] = "no-store"
     return resp
 

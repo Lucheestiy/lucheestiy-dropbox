@@ -26,6 +26,10 @@ Many iPhone `.mov` uploads store the `moov` atom at the end of the file, which m
 
 This stack includes a `droppr-faststart` service that automatically fixes new `.mov/.mp4/.m4v` uploads by moving `moov` to the front **without re-encoding**.
 
+## Video Metadata (Original vs Processed)
+
+Some uploads are modified by `droppr-faststart` (e.g., HEVC → H.264 transcode, timestamp fixes, or faststart). Droppr records the **original** and **post-processing** metadata (size, resolution, codecs, duration) to `./database/droppr-video-meta.sqlite3` and shows it in a small “Video details” panel when previewing a video in the File Browser UI.
+
 ## Video Quality (Fast + HD)
 
 The public gallery opens videos in `/player` and can use cached proxy MP4s (served from `/api/proxy-cache/...`) for faster reloads and seeking:
