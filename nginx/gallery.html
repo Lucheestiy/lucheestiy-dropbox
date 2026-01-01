@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Shared Media Gallery</title>
     <style>
+        /* Dark Theme (default) */
         :root {
             --bg-color: #0f172a;
             --card-bg: rgba(30, 41, 59, 0.85);
@@ -15,6 +16,24 @@
             --accent-hover: #4f46e5;
             --success-color: #10b981;
             --modal-bg: rgba(0, 0, 0, 0.95);
+            --input-bg: rgba(0, 0, 0, 0.2);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --hover-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Light Theme */
+        [data-theme="light"] {
+            --bg-color: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --accent-color: #4f46e5;
+            --accent-hover: #4338ca;
+            --success-color: #059669;
+            --modal-bg: rgba(255, 255, 255, 0.98);
+            --input-bg: rgba(0, 0, 0, 0.05);
+            --border-color: rgba(0, 0, 0, 0.1);
+            --hover-bg: rgba(0, 0, 0, 0.05);
         }
 
         * {
@@ -34,6 +53,15 @@
             min-height: 100vh;
             color: var(--text-primary);
             overflow-x: hidden;
+        }
+
+        /* Light theme body background */
+        [data-theme="light"] body,
+        body[data-theme="light"] {
+            background-image:
+                radial-gradient(at 0% 0%, hsla(220,30%,96%,1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(220,40%,92%,1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(280,30%,95%,1) 0, transparent 50%);
         }
 
         /* When the modal is open, hide the heavy background DOM to reduce memory/paint work on mobile. */
@@ -928,6 +956,160 @@
         .media-card:hover .media-preview-container::after {
             opacity: 1;
         }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+        }
+
+        .theme-toggle:hover {
+            background: var(--hover-bg);
+            transform: scale(1.05);
+        }
+
+        /* Light Theme Specific Overrides */
+        [data-theme="light"] .controls-bar {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+        }
+
+        [data-theme="light"] .search-box input {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .filter-group {
+            background: var(--input-bg);
+        }
+
+        [data-theme="light"] .filter-btn {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] .sort-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .action-btn.secondary {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .action-btn.secondary:hover {
+            background: var(--hover-bg);
+        }
+
+        [data-theme="light"] .media-card {
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .card-btn {
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .card-btn:hover {
+            background: var(--hover-bg);
+        }
+
+        [data-theme="light"] .modal {
+            background: var(--modal-bg);
+        }
+
+        [data-theme="light"] .modal-header {
+            background: linear-gradient(to bottom, rgba(255,255,255,0.95), transparent);
+        }
+
+        [data-theme="light"] .modal-footer {
+            background: linear-gradient(to top, rgba(255,255,255,0.95), transparent);
+        }
+
+        [data-theme="light"] .icon-btn {
+            background: rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .icon-btn:hover {
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        [data-theme="light"] .nav-btn {
+            background: rgba(0, 0, 0, 0.1);
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .nav-btn:hover {
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        [data-theme="light"] .toast {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        [data-theme="light"] .help-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        [data-theme="light"] .skeleton-preview {
+            background: linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.05) 75%);
+            background-size: 200% 100%;
+        }
+
+        [data-theme="light"] .skeleton-title,
+        [data-theme="light"] .skeleton-meta {
+            background: rgba(0,0,0,0.08);
+        }
+
+        [data-theme="light"] .header h1 {
+            background: linear-gradient(to right, #1e293b, #475569);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        [data-theme="light"] .layout-toggle {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        [data-theme="light"] .layout-toggle button {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="light"] .play-icon {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: var(--text-primary);
+        }
+
+        [data-theme="light"] .file-placeholder {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        [data-theme="light"] .shortcut-key kbd {
+            background: rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+        }
     </style>
 </head>
 <body>
@@ -975,6 +1157,8 @@
                 <button id="gridViewBtn" class="active" title="Grid view" aria-label="Grid view">▦</button>
                 <button id="listViewBtn" title="List view" aria-label="List view">☰</button>
             </div>
+
+            <button class="theme-toggle" id="themeToggle" title="Toggle dark/light theme" aria-label="Toggle theme">🌙</button>
 
             <button class="action-btn secondary" id="detailsBtn" title="Toggle video details">ℹ Details</button>
             <button class="action-btn secondary" id="copyLinkBtn">🔗 Share</button>
@@ -1142,6 +1326,7 @@
             els.resetVideoBtn = document.getElementById('resetVideoBtn');
             els.helpOverlay = document.getElementById('helpOverlay');
             els.offlineBanner = document.getElementById('offlineBanner');
+            els.themeToggle = document.getElementById('themeToggle');
         }
 
         // ============ PREFERENCES ============
@@ -1157,6 +1342,35 @@
             try {
                 localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...prefs }));
             } catch {}
+        }
+
+        // ============ THEME FUNCTIONS ============
+        function getTheme() {
+            const prefs = loadPrefs();
+            return prefs.theme || 'dark';
+        }
+
+        function setTheme(theme) {
+            const isDark = theme === 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            if (els.themeToggle) {
+                els.themeToggle.textContent = isDark ? '🌙' : '☀️';
+                els.themeToggle.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+            }
+            savePrefs({ theme });
+        }
+
+        function toggleTheme() {
+            const current = getTheme();
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        function initTheme() {
+            const theme = getTheme();
+            setTheme(theme);
+            if (els.themeToggle) {
+                els.themeToggle.addEventListener('click', toggleTheme);
+            }
         }
 
         // ============ UTILITY FUNCTIONS ============
@@ -2166,6 +2380,7 @@
         // ============ INITIALIZATION ============
         async function init() {
             initElements();
+            initTheme();
 
             // Get share hash
             state.shareHash = new URLSearchParams(window.location.search).get('share') ||

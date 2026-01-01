@@ -1,4 +1,4 @@
-/* Droppr Dark Theme (Matches Gallery) */
+/* Droppr Dark Theme (Matches Gallery) - Default */
 :root {
     --bg-color: #0f172a !important;
     --card-bg: #1e293b !important;
@@ -6,6 +6,25 @@
     --text-secondary: #94a3b8 !important;
     --accent-color: #6366f1 !important;
     --border-color: rgba(255, 255, 255, 0.1) !important;
+    --input-bg: rgba(0, 0, 0, 0.2) !important;
+    --hover-bg: rgba(255, 255, 255, 0.1) !important;
+    --scrollbar-thumb: #334155;
+    --scrollbar-thumb-hover: #475569;
+}
+
+/* Light Theme Variables */
+[data-theme="light"],
+.light-theme {
+    --bg-color: #f8fafc !important;
+    --card-bg: #ffffff !important;
+    --text-primary: #1e293b !important;
+    --text-secondary: #64748b !important;
+    --accent-color: #4f46e5 !important;
+    --border-color: rgba(0, 0, 0, 0.12) !important;
+    --input-bg: #ffffff !important;
+    --hover-bg: rgba(0, 0, 0, 0.04) !important;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-thumb-hover: #94a3b8;
 }
 
 body, #app, .v-application {
@@ -74,18 +93,17 @@ input, textarea, select {
     height: 8px;
 }
 ::-webkit-scrollbar-track {
-    background: var(--bg-color); 
+    background: var(--bg-color);
 }
 ::-webkit-scrollbar-thumb {
-    background: #334155; 
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #475569; 
+    background: var(--scrollbar-thumb-hover);
 }
 
 /* File Browser Specifics */
-/* Hide the default logo if possible or recolor */
 .v-toolbar__title {
     color: var(--text-primary) !important;
 }
@@ -101,4 +119,841 @@ input, textarea, select {
 }
 #loading .spinner > div {
     background-color: var(--accent-color) !important;
+}
+
+/* ============================================
+   LIGHT THEME - COMPREHENSIVE OVERRIDES
+   ============================================ */
+
+/* Main containers */
+[data-theme="light"] body,
+.light-theme body,
+body[data-theme="light"],
+body.light-theme {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] #app,
+.light-theme #app {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-application,
+.light-theme .v-application {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-application--wrap,
+.light-theme .v-application--wrap {
+    background-color: #f8fafc !important;
+}
+
+/* Header/Toolbar */
+[data-theme="light"] .v-app-bar,
+.light-theme .v-app-bar,
+[data-theme="light"] .v-toolbar,
+.light-theme .v-toolbar,
+[data-theme="light"] header,
+.light-theme header {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid rgba(0,0,0,0.1) !important;
+}
+
+[data-theme="light"] .v-toolbar__content,
+.light-theme .v-toolbar__content {
+    background-color: transparent !important;
+}
+
+/* Sidebar/Navigation */
+[data-theme="light"] .v-navigation-drawer,
+.light-theme .v-navigation-drawer,
+[data-theme="light"] nav,
+.light-theme nav {
+    background-color: #ffffff !important;
+    border-right: 1px solid rgba(0,0,0,0.1) !important;
+}
+
+[data-theme="light"] .v-navigation-drawer__content,
+.light-theme .v-navigation-drawer__content {
+    background-color: #ffffff !important;
+}
+
+/* Cards and Sheets */
+[data-theme="light"] .v-card,
+.light-theme .v-card,
+[data-theme="light"] .v-sheet,
+.light-theme .v-sheet {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* Search Bar / Text Fields */
+[data-theme="light"] .v-text-field,
+.light-theme .v-text-field {
+    background-color: #ffffff !important;
+}
+
+[data-theme="light"] .v-text-field__slot,
+.light-theme .v-text-field__slot {
+    background-color: #ffffff !important;
+}
+
+[data-theme="light"] .v-text-field input,
+.light-theme .v-text-field input,
+[data-theme="light"] .v-input input,
+.light-theme .v-input input,
+[data-theme="light"] input,
+.light-theme input {
+    color: #1e293b !important;
+    background-color: #ffffff !important;
+}
+
+[data-theme="light"] .v-text-field .v-input__slot,
+.light-theme .v-text-field .v-input__slot,
+[data-theme="light"] .v-input__slot,
+.light-theme .v-input__slot {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
+}
+
+[data-theme="light"] .v-text-field--outlined .v-input__slot,
+.light-theme .v-text-field--outlined .v-input__slot {
+    background-color: #ffffff !important;
+}
+
+/* Input placeholders */
+[data-theme="light"] input::placeholder,
+.light-theme input::placeholder,
+[data-theme="light"] .v-text-field input::placeholder,
+.light-theme .v-text-field input::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+}
+
+/* Labels */
+[data-theme="light"] .v-label,
+.light-theme .v-label,
+[data-theme="light"] label,
+.light-theme label {
+    color: #64748b !important;
+}
+
+/* Breadcrumbs / File Path Navigation */
+[data-theme="light"] .v-breadcrumbs,
+.light-theme .v-breadcrumbs {
+    background-color: transparent !important;
+}
+
+[data-theme="light"] .v-breadcrumbs__item,
+.light-theme .v-breadcrumbs__item,
+[data-theme="light"] .v-breadcrumbs a,
+.light-theme .v-breadcrumbs a {
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-breadcrumbs__divider,
+.light-theme .v-breadcrumbs__divider {
+    color: #94a3b8 !important;
+}
+
+/* File List Items */
+[data-theme="light"] .v-list,
+.light-theme .v-list {
+    background-color: transparent !important;
+}
+
+[data-theme="light"] .v-list-item,
+.light-theme .v-list-item {
+    background-color: transparent !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-list-item:hover,
+.light-theme .v-list-item:hover {
+    background-color: rgba(0,0,0,0.04) !important;
+}
+
+[data-theme="light"] .v-list-item__title,
+.light-theme .v-list-item__title {
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-list-item__subtitle,
+.light-theme .v-list-item__subtitle {
+    color: #64748b !important;
+}
+
+[data-theme="light"] .v-list-item__icon,
+.light-theme .v-list-item__icon {
+    color: #64748b !important;
+}
+
+/* File names and text */
+[data-theme="light"] .item .name,
+.light-theme .item .name,
+[data-theme="light"] .filename,
+.light-theme .filename,
+[data-theme="light"] [class*="name"],
+.light-theme [class*="name"] {
+    color: #1e293b !important;
+}
+
+/* Table rows (file listing) */
+[data-theme="light"] table,
+.light-theme table {
+    background-color: transparent !important;
+}
+
+[data-theme="light"] tr,
+.light-theme tr,
+[data-theme="light"] td,
+.light-theme td,
+[data-theme="light"] th,
+.light-theme th {
+    background-color: transparent !important;
+    color: #1e293b !important;
+    border-color: rgba(0,0,0,0.08) !important;
+}
+
+[data-theme="light"] tr:hover,
+.light-theme tr:hover {
+    background-color: rgba(0,0,0,0.04) !important;
+}
+
+/* Icons in light theme - consistent dark grey */
+[data-theme="light"] .v-icon,
+.light-theme .v-icon,
+[data-theme="light"] i.material-icons,
+.light-theme i.material-icons,
+[data-theme="light"] i,
+.light-theme i,
+[data-theme="light"] svg,
+.light-theme svg,
+[data-theme="light"] [class*="icon"],
+.light-theme [class*="icon"] {
+    color: #475569 !important;
+}
+
+[data-theme="light"] .v-icon.primary--text,
+.light-theme .v-icon.primary--text {
+    color: #4f46e5 !important;
+}
+
+/* Action icons - copy, delete, share, etc */
+[data-theme="light"] .v-btn .v-icon,
+.light-theme .v-btn .v-icon,
+[data-theme="light"] button .v-icon,
+.light-theme button .v-icon,
+[data-theme="light"] .action .v-icon,
+.light-theme .action .v-icon,
+[data-theme="light"] [class*="action"] .v-icon,
+.light-theme [class*="action"] .v-icon {
+    color: #475569 !important;
+}
+
+/* Copy icon */
+[data-theme="light"] [class*="copy"] .v-icon,
+.light-theme [class*="copy"] .v-icon,
+[data-theme="light"] [class*="copy"] i,
+.light-theme [class*="copy"] i,
+[data-theme="light"] .mdi-content-copy,
+.light-theme .mdi-content-copy {
+    color: #475569 !important;
+}
+
+/* Delete icon */
+[data-theme="light"] [class*="delete"] .v-icon,
+.light-theme [class*="delete"] .v-icon,
+[data-theme="light"] [class*="delete"] i,
+.light-theme [class*="delete"] i,
+[data-theme="light"] .mdi-delete,
+.light-theme .mdi-delete {
+    color: #dc2626 !important;
+}
+
+/* Share icon */
+[data-theme="light"] [class*="share"] .v-icon,
+.light-theme [class*="share"] .v-icon,
+[data-theme="light"] .mdi-share-variant,
+.light-theme .mdi-share-variant {
+    color: #475569 !important;
+}
+
+/* Download icon */
+[data-theme="light"] [class*="download"] .v-icon,
+.light-theme [class*="download"] .v-icon,
+[data-theme="light"] .mdi-download,
+.light-theme .mdi-download {
+    color: #475569 !important;
+}
+
+/* Folder/file icons */
+[data-theme="light"] .mdi-folder,
+.light-theme .mdi-folder {
+    color: #f59e0b !important;
+}
+
+[data-theme="light"] .mdi-file,
+.light-theme .mdi-file,
+[data-theme="light"] [class*="file"] .v-icon,
+.light-theme [class*="file"] .v-icon {
+    color: #475569 !important;
+}
+
+/* Buttons */
+[data-theme="light"] .v-btn,
+.light-theme .v-btn {
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-btn--icon,
+.light-theme .v-btn--icon {
+    color: #64748b !important;
+}
+
+[data-theme="light"] .v-btn.primary,
+.light-theme .v-btn.primary,
+[data-theme="light"] .v-btn--contained,
+.light-theme .v-btn--contained {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+
+/* Menus and Dropdowns */
+[data-theme="light"] .v-menu__content,
+.light-theme .v-menu__content {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+}
+
+[data-theme="light"] .v-select__selections,
+.light-theme .v-select__selections {
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-select-list,
+.light-theme .v-select-list {
+    background-color: #ffffff !important;
+}
+
+/* Dialogs/Modals */
+[data-theme="light"] .v-dialog,
+.light-theme .v-dialog {
+    background-color: #ffffff !important;
+}
+
+[data-theme="light"] .v-dialog .v-card,
+.light-theme .v-dialog .v-card {
+    background-color: #ffffff !important;
+}
+
+/* Dividers */
+[data-theme="light"] .v-divider,
+.light-theme .v-divider,
+[data-theme="light"] hr,
+.light-theme hr {
+    border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* Main content area */
+[data-theme="light"] main,
+.light-theme main,
+[data-theme="light"] .v-main,
+.light-theme .v-main,
+[data-theme="light"] .v-main__wrap,
+.light-theme .v-main__wrap {
+    background-color: #f8fafc !important;
+}
+
+/* FileBrowser specific - listing area */
+[data-theme="light"] #listing,
+.light-theme #listing,
+[data-theme="light"] .listing,
+.light-theme .listing {
+    background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .item,
+.light-theme .item {
+    background-color: transparent !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .item:hover,
+.light-theme .item:hover {
+    background-color: rgba(0,0,0,0.04) !important;
+}
+
+/* Action bar */
+[data-theme="light"] #action-bar,
+.light-theme #action-bar,
+[data-theme="light"] .action-bar,
+.light-theme .action-bar {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid rgba(0,0,0,0.1) !important;
+}
+
+/* Overlay/Backdrop */
+[data-theme="light"] .v-overlay__scrim,
+.light-theme .v-overlay__scrim {
+    background-color: rgba(0,0,0,0.3) !important;
+}
+
+/* Checkboxes */
+[data-theme="light"] .v-input--checkbox .v-icon,
+.light-theme .v-input--checkbox .v-icon {
+    color: #64748b !important;
+}
+
+/* Progress bars */
+[data-theme="light"] .v-progress-linear,
+.light-theme .v-progress-linear {
+    background-color: rgba(0,0,0,0.1) !important;
+}
+
+/* Chips/Tags */
+[data-theme="light"] .v-chip,
+.light-theme .v-chip {
+    background-color: rgba(0,0,0,0.08) !important;
+    color: #1e293b !important;
+}
+
+/* Snackbar/Toast */
+[data-theme="light"] .v-snack__wrapper,
+.light-theme .v-snack__wrapper {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+/* Empty state text */
+[data-theme="light"] .empty-state,
+.light-theme .empty-state,
+[data-theme="light"] [class*="empty"],
+.light-theme [class*="empty"] {
+    color: #64748b !important;
+}
+
+/* Scrollbars for light theme */
+[data-theme="light"] ::-webkit-scrollbar-track,
+.light-theme ::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb,
+.light-theme ::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover,
+.light-theme ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8 !important;
+}
+
+/* ============================================
+   ADDITIONAL LIGHT THEME FIXES
+   ============================================ */
+
+/* Search bar placeholder - more specific */
+html[data-theme="light"] input::-webkit-input-placeholder,
+body[data-theme="light"] input::-webkit-input-placeholder,
+html.light-theme input::-webkit-input-placeholder,
+body.light-theme input::-webkit-input-placeholder,
+[data-theme="light"] input::-webkit-input-placeholder,
+.light-theme input::-webkit-input-placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: #64748b !important;
+}
+html[data-theme="light"] input::-moz-placeholder,
+body[data-theme="light"] input::-moz-placeholder,
+[data-theme="light"] input::-moz-placeholder,
+.light-theme input::-moz-placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+}
+html[data-theme="light"] input:-ms-input-placeholder,
+body[data-theme="light"] input:-ms-input-placeholder,
+[data-theme="light"] input:-ms-input-placeholder,
+.light-theme input:-ms-input-placeholder {
+    color: #64748b !important;
+}
+html[data-theme="light"] input::placeholder,
+body[data-theme="light"] input::placeholder,
+[data-theme="light"] input::placeholder,
+.light-theme input::placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: #64748b !important;
+}
+/* Force placeholder color on all inputs */
+html[data-theme="light"] input,
+body[data-theme="light"] input,
+html.light-theme input,
+body.light-theme input {
+    --placeholder-color: #64748b !important;
+}
+
+/* Navigation bar / Header with home icon */
+[data-theme="light"] #nav,
+.light-theme #nav,
+[data-theme="light"] .nav,
+.light-theme .nav,
+[data-theme="light"] [id*="nav"],
+.light-theme [id*="nav"],
+[data-theme="light"] [class*="nav"],
+.light-theme [class*="nav"] {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] #nav *,
+.light-theme #nav *,
+[data-theme="light"] .nav *,
+.light-theme .nav * {
+    color: #1e293b !important;
+}
+
+/* Breadcrumb/path bar */
+[data-theme="light"] #breadcrumbs,
+.light-theme #breadcrumbs,
+[data-theme="light"] .breadcrumbs,
+.light-theme .breadcrumbs,
+[data-theme="light"] [class*="breadcrumb"],
+.light-theme [class*="breadcrumb"],
+[data-theme="light"] [class*="path"],
+.light-theme [class*="path"] {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] #breadcrumbs *,
+.light-theme #breadcrumbs *,
+[data-theme="light"] .breadcrumbs *,
+.light-theme .breadcrumbs *,
+[data-theme="light"] [class*="breadcrumb"] *,
+.light-theme [class*="breadcrumb"] *,
+[data-theme="light"] [class*="path"] a,
+.light-theme [class*="path"] a,
+[data-theme="light"] [class*="path"] span,
+.light-theme [class*="path"] span {
+    color: #1e293b !important;
+}
+
+/* Home icon and navigation icons */
+[data-theme="light"] .home,
+.light-theme .home,
+[data-theme="light"] [class*="home"],
+.light-theme [class*="home"],
+[data-theme="light"] .breadcrumbs .v-icon,
+.light-theme .breadcrumbs .v-icon,
+[data-theme="light"] #nav .v-icon,
+.light-theme #nav .v-icon {
+    color: #64748b !important;
+}
+
+/* File metadata / description text */
+[data-theme="light"] .meta,
+.light-theme .meta,
+[data-theme="light"] .metadata,
+.light-theme .metadata,
+[data-theme="light"] [class*="meta"],
+.light-theme [class*="meta"],
+[data-theme="light"] .description,
+.light-theme .description,
+[data-theme="light"] [class*="description"],
+.light-theme [class*="description"],
+[data-theme="light"] .info,
+.light-theme .info,
+[data-theme="light"] [class*="info"],
+.light-theme [class*="info"],
+[data-theme="light"] .details,
+.light-theme .details,
+[data-theme="light"] [class*="details"],
+.light-theme [class*="details"] {
+    color: #64748b !important;
+}
+
+/* "No metadata recorded" and similar placeholder text - much darker for readability */
+[data-theme="light"] .no-meta,
+.light-theme .no-meta,
+[data-theme="light"] .no-data,
+.light-theme .no-data,
+[data-theme="light"] .muted,
+.light-theme .muted,
+[data-theme="light"] .text-muted,
+.light-theme .text-muted,
+[data-theme="light"] .secondary-text,
+.light-theme .secondary-text,
+[data-theme="light"] small,
+.light-theme small {
+    color: #334155 !important;
+}
+
+/* Droppr video details text - make it readable */
+[data-theme="light"] .droppr-video-row-details,
+.light-theme .droppr-video-row-details,
+[data-theme="light"] .droppr-video-details-row,
+.light-theme .droppr-video-details-row,
+[data-theme="light"] [class*="droppr-video"],
+.light-theme [class*="droppr-video"] {
+    color: #334155 !important;
+}
+
+/* File size, date, and other secondary info */
+[data-theme="light"] .size,
+.light-theme .size,
+[data-theme="light"] .date,
+.light-theme .date,
+[data-theme="light"] .modified,
+.light-theme .modified,
+[data-theme="light"] [class*="size"],
+.light-theme [class*="size"],
+[data-theme="light"] [class*="date"],
+.light-theme [class*="date"] {
+    color: #64748b !important;
+}
+
+/* Header bar / top bar */
+[data-theme="light"] #header,
+.light-theme #header,
+[data-theme="light"] .header,
+.light-theme .header,
+[data-theme="light"] [id*="header"],
+.light-theme [id*="header"],
+[data-theme="light"] [class*="header"],
+.light-theme [class*="header"],
+[data-theme="light"] [class*="toolbar"],
+.light-theme [class*="toolbar"] {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* Span and div text in light theme */
+[data-theme="light"] span,
+.light-theme span,
+[data-theme="light"] div,
+.light-theme div {
+    color: inherit;
+}
+
+/* Force all text in main content to be dark */
+[data-theme="light"] #app span,
+.light-theme #app span,
+[data-theme="light"] #app div,
+.light-theme #app div,
+[data-theme="light"] #app p,
+.light-theme #app p,
+[data-theme="light"] #app a,
+.light-theme #app a {
+    color: #1e293b;
+}
+
+/* But keep secondary/muted text lighter */
+[data-theme="light"] #app .v-list-item__subtitle,
+.light-theme #app .v-list-item__subtitle,
+[data-theme="light"] #app .text--secondary,
+.light-theme #app .text--secondary {
+    color: #64748b !important;
+}
+
+/* Video meta inline panel */
+[data-theme="light"] #droppr-video-meta-inline,
+.light-theme #droppr-video-meta-inline,
+[data-theme="light"] .droppr-video-row-details,
+.light-theme .droppr-video-row-details,
+[data-theme="light"] .droppr-video-details-row,
+.light-theme .droppr-video-details-row {
+    color: #475569 !important;
+    background-color: transparent !important;
+}
+
+/* ============================================
+   SHARE MODAL / DIALOG
+   ============================================ */
+
+/* Share modal container */
+[data-theme="light"] .v-dialog,
+.light-theme .v-dialog,
+[data-theme="light"] .v-dialog__content,
+.light-theme .v-dialog__content,
+[data-theme="light"] [class*="dialog"],
+.light-theme [class*="dialog"],
+[data-theme="light"] [class*="modal"],
+.light-theme [class*="modal"],
+[data-theme="light"] [class*="share"],
+.light-theme [class*="share"],
+[data-theme="light"] .share,
+.light-theme .share {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+
+/* Share modal card */
+[data-theme="light"] .v-dialog .v-card,
+.light-theme .v-dialog .v-card,
+[data-theme="light"] .v-dialog .v-sheet,
+.light-theme .v-dialog .v-sheet,
+[data-theme="light"] [class*="share"] .v-card,
+.light-theme [class*="share"] .v-card {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+
+/* Share modal title */
+[data-theme="light"] .v-dialog .v-card__title,
+.light-theme .v-dialog .v-card__title,
+[data-theme="light"] .v-dialog h1,
+.light-theme .v-dialog h1,
+[data-theme="light"] .v-dialog h2,
+.light-theme .v-dialog h2,
+[data-theme="light"] .v-dialog h3,
+.light-theme .v-dialog h3 {
+    color: #1e293b !important;
+}
+
+/* Share modal text and content */
+[data-theme="light"] .v-dialog .v-card__text,
+.light-theme .v-dialog .v-card__text,
+[data-theme="light"] .v-dialog p,
+.light-theme .v-dialog p,
+[data-theme="light"] .v-dialog span,
+.light-theme .v-dialog span,
+[data-theme="light"] .v-dialog div,
+.light-theme .v-dialog div,
+[data-theme="light"] .v-dialog label,
+.light-theme .v-dialog label {
+    color: #1e293b !important;
+}
+
+/* Share link input fields */
+[data-theme="light"] .v-dialog input,
+.light-theme .v-dialog input,
+[data-theme="light"] .v-dialog .v-text-field,
+.light-theme .v-dialog .v-text-field,
+[data-theme="light"] .v-dialog .v-input,
+.light-theme .v-dialog .v-input,
+[data-theme="light"] [class*="share"] input,
+.light-theme [class*="share"] input {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
+}
+
+[data-theme="light"] .v-dialog .v-input__slot,
+.light-theme .v-dialog .v-input__slot,
+[data-theme="light"] [class*="share"] .v-input__slot,
+.light-theme [class*="share"] .v-input__slot {
+    background-color: #f1f5f9 !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
+}
+
+/* Share link text (the actual URL) */
+[data-theme="light"] .v-dialog code,
+.light-theme .v-dialog code,
+[data-theme="light"] .v-dialog pre,
+.light-theme .v-dialog pre,
+[data-theme="light"] .v-dialog .link,
+.light-theme .v-dialog .link,
+[data-theme="light"] .v-dialog [class*="link"],
+.light-theme .v-dialog [class*="link"],
+[data-theme="light"] .v-dialog [class*="url"],
+.light-theme .v-dialog [class*="url"],
+[data-theme="light"] [class*="share"] code,
+.light-theme [class*="share"] code {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+}
+
+/* Copy button and actions in share modal */
+[data-theme="light"] .v-dialog .v-card__actions,
+.light-theme .v-dialog .v-card__actions,
+[data-theme="light"] .v-dialog .v-btn,
+.light-theme .v-dialog .v-btn {
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .v-dialog .v-btn.primary,
+.light-theme .v-dialog .v-btn.primary,
+[data-theme="light"] .v-dialog .v-btn--contained,
+.light-theme .v-dialog .v-btn--contained {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+
+/* Share modal icons */
+[data-theme="light"] .v-dialog .v-icon,
+.light-theme .v-dialog .v-icon,
+[data-theme="light"] [class*="share"] .v-icon,
+.light-theme [class*="share"] .v-icon {
+    color: #64748b !important;
+}
+
+/* Prompts and info text in modals */
+[data-theme="light"] .v-dialog .prompt,
+.light-theme .v-dialog .prompt,
+[data-theme="light"] .v-dialog .message,
+.light-theme .v-dialog .message,
+[data-theme="light"] .v-dialog .hint,
+.light-theme .v-dialog .hint {
+    color: #475569 !important;
+}
+
+/* Textarea in share modal */
+[data-theme="light"] .v-dialog textarea,
+.light-theme .v-dialog textarea,
+[data-theme="light"] [class*="share"] textarea,
+.light-theme [class*="share"] textarea {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
+}
+
+/* All child elements in dialogs */
+[data-theme="light"] .v-dialog *,
+.light-theme .v-dialog * {
+    border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* Make metadata text darker for better readability */
+[data-theme="light"] .v-list-item__subtitle,
+.light-theme .v-list-item__subtitle,
+[data-theme="light"] .file-info,
+.light-theme .file-info,
+[data-theme="light"] .item-info,
+.light-theme .item-info {
+    color: #475569 !important;
+}
+
+/* Theme Toggle Button */
+#droppr-theme-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 70px;
+    z-index: 2147483000;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+#droppr-theme-toggle:hover {
+    transform: scale(1.1);
+    background: var(--hover-bg);
 }

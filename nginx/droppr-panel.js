@@ -2,7 +2,7 @@
   if (window.__dropprPanelBooted) return;
   window.__dropprPanelBooted = true;
 
-  var DROPPR_PANEL_VERSION = "15";
+  var DROPPR_PANEL_VERSION = "19";
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
   var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
@@ -18,6 +18,8 @@
   var VIDEO_ROW_DETAILS_CLASS = "droppr-video-row-details";
   var VIDEO_DETAILS_ROW_CLASS = "droppr-video-details-row";
   var DEBUG_BADGE_ID = "droppr-debug-badge";
+  var THEME_TOGGLE_BTN_ID = "droppr-theme-toggle";
+  var THEME_PREFS_KEY = "droppr_gallery_prefs";
 
   var uploadBatch = null;
   var tusUploads = {};
@@ -171,6 +173,131 @@
       '<span class="label">Analytics</span>';
 
     document.body.appendChild(a);
+  }
+
+  // ============ THEME TOGGLE ============
+  function loadThemePrefs() {
+    try {
+      return JSON.parse(localStorage.getItem(THEME_PREFS_KEY) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveThemePrefs(prefs) {
+    try {
+      var existing = loadThemePrefs();
+      for (var key in prefs) {
+        existing[key] = prefs[key];
+      }
+      localStorage.setItem(THEME_PREFS_KEY, JSON.stringify(existing));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function getTheme() {
+    var prefs = loadThemePrefs();
+    return prefs.theme || "dark";
+  }
+
+  function setTheme(theme) {
+    var isDark = theme === "dark";
+
+    // Set on both html and body for maximum compatibility
+    document.documentElement.setAttribute("data-theme", theme);
+    document.body.setAttribute("data-theme", theme);
+
+    // Also add/remove class for FileBrowser Vue compatibility
+    if (isDark) {
+      document.documentElement.classList.remove("light-theme");
+      document.body.classList.remove("light-theme");
+    } else {
+      document.documentElement.classList.add("light-theme");
+      document.body.classList.add("light-theme");
+    }
+
+    var btn = document.getElementById(THEME_TOGGLE_BTN_ID);
+    if (btn) {
+      btn.textContent = isDark ? "🌙" : "☀️";
+      btn.title = isDark ? "Switch to light theme" : "Switch to dark theme";
+      // Update button colors based on theme
+      btn.style.background = isDark ? "#1e293b" : "#ffffff";
+      btn.style.color = isDark ? "#f1f5f9" : "#1e293b";
+      btn.style.borderColor = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
+    }
+
+    // Fix search input placeholder via JavaScript for iOS
+    fixPlaceholderColors(isDark);
+
+    saveThemePrefs({ theme: theme });
+  }
+
+  function fixPlaceholderColors(isDark) {
+    // Inject a style tag to force placeholder colors
+    var styleId = "droppr-placeholder-fix";
+    var existing = document.getElementById(styleId);
+    if (existing) {
+      existing.parentNode.removeChild(existing);
+    }
+
+    var placeholderColor = isDark ? "#94a3b8" : "#475569";
+    var style = document.createElement("style");
+    style.id = styleId;
+    style.textContent =
+      "input::placeholder, input::-webkit-input-placeholder { " +
+      "  color: " + placeholderColor + " !important; " +
+      "  opacity: 1 !important; " +
+      "  -webkit-text-fill-color: " + placeholderColor + " !important; " +
+      "} " +
+      "input::-moz-placeholder { " +
+      "  color: " + placeholderColor + " !important; " +
+      "  opacity: 1 !important; " +
+      "} " +
+      "input:-ms-input-placeholder { " +
+      "  color: " + placeholderColor + " !important; " +
+      "} ";
+    document.head.appendChild(style);
+  }
+
+  function toggleTheme() {
+    var current = getTheme();
+    var newTheme = current === "dark" ? "light" : "dark";
+    // Debug: show what's happening
+    console.log("Droppr: Toggling theme from " + current + " to " + newTheme);
+    setTheme(newTheme);
+  }
+
+  function ensureThemeToggle() {
+    var existing = document.getElementById(THEME_TOGGLE_BTN_ID);
+    if (existing) return;
+
+    // Initialize theme from prefs
+    var theme = getTheme();
+    document.documentElement.setAttribute("data-theme", theme);
+
+    var btn = document.createElement("button");
+    btn.id = THEME_TOGGLE_BTN_ID;
+    btn.type = "button";
+    btn.textContent = theme === "dark" ? "🌙" : "☀️";
+    btn.title = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+    btn.style.cssText =
+      "position:fixed;right:18px;bottom:70px;z-index:2147483000;" +
+      "display:inline-flex;align-items:center;justify-content:center;" +
+      "width:44px;height:44px;border-radius:50%;" +
+      "background:var(--card-bg,#1e293b);color:var(--text-primary,#f1f5f9);" +
+      "font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,0.25);" +
+      "border:1px solid var(--border-color,rgba(255,255,255,0.1));" +
+      "cursor:pointer;-webkit-tap-highlight-color:transparent;" +
+      "touch-action:manipulation;user-select:none;";
+
+    // Use click event - works on iOS when button has proper touch-action
+    btn.addEventListener("click", function(e) {
+      e.preventDefault();
+      toggleTheme();
+    }, false);
+
+    document.body.appendChild(btn);
   }
 
   function ensureVideoMetaStyles() {
@@ -2781,6 +2908,7 @@
   function boot() {
     patchUploadDetectors();
     patchFileInputs();
+    ensureThemeToggle();
     ensureAnalyticsButton();
     ensureShareExpireButtons();
     startVideoMetaWatcher();

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Droppr Analytics</title>
     <style>
+        /* Dark Theme (default) */
         :root {
             --bg: #0f172a;
             --panel: rgba(30, 41, 59, 0.75);
@@ -17,6 +18,24 @@
             --danger: #ef4444;
             --success: #10b981;
             --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            --input-bg: rgba(0, 0, 0, 0.22);
+            --topbar-bg: rgba(15, 23, 42, 0.65);
+        }
+
+        /* Light Theme */
+        [data-theme="light"] {
+            --bg: #f8fafc;
+            --panel: rgba(255, 255, 255, 0.85);
+            --panel-solid: #ffffff;
+            --border: rgba(0, 0, 0, 0.1);
+            --text: #1e293b;
+            --muted: #64748b;
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --danger: #dc2626;
+            --success: #059669;
+            --input-bg: rgba(0, 0, 0, 0.05);
+            --topbar-bg: rgba(248, 250, 252, 0.85);
         }
 
         * { box-sizing: border-box; }
@@ -30,6 +49,15 @@
                 radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%),
                 radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
             color: var(--text);
+        }
+
+        /* Light theme body background */
+        [data-theme="light"] body,
+        body[data-theme="light"] {
+            background-image:
+                radial-gradient(at 0% 0%, hsla(220,30%,96%,1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(220,40%,92%,1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(280,30%,95%,1) 0, transparent 50%);
         }
 
         a { color: inherit; }
@@ -362,6 +390,75 @@
             text-transform: uppercase;
             letter-spacing: 0.08em;
         }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.68rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: scale(1.05);
+        }
+
+        /* Light Theme Specific Overrides */
+        [data-theme="light"] .topbar {
+            background: var(--topbar-bg);
+        }
+
+        [data-theme="light"] select,
+        [data-theme="light"] input[type="text"] {
+            background: var(--input-bg);
+        }
+
+        [data-theme="light"] .chip {
+            background: var(--input-bg);
+        }
+
+        [data-theme="light"] .btn.secondary {
+            background: var(--input-bg);
+        }
+
+        [data-theme="light"] .btn.secondary:hover {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .theme-toggle:hover {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .card {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="light"] .panel-header {
+            background: var(--input-bg);
+        }
+
+        [data-theme="light"] .detail-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+        }
+
+        [data-theme="light"] table tbody tr:hover td {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        [data-theme="light"] .tag {
+            background: rgba(99, 102, 241, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -379,6 +476,7 @@
                     <option value="365">Last 365 days</option>
                     <option value="0">All time</option>
                 </select>
+                <button class="theme-toggle" id="themeToggle" title="Toggle dark/light theme" aria-label="Toggle theme">🌙</button>
                 <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
                 <a class="btn primary" href="/settings/shares" target="_blank" rel="noopener">Manage Shares</a>
             </div>
@@ -534,6 +632,7 @@
             eventsBody: document.getElementById('eventsBody'),
             exportCsv: document.getElementById('exportCsvBtn'),
             openGallery: document.getElementById('openGalleryBtn'),
+            themeToggle: document.getElementById('themeToggle'),
         };
 
         const state = {
@@ -543,6 +642,52 @@
             shares: [],
             selectedHash: null,
         };
+
+        // ============ THEME FUNCTIONS ============
+        const PREFS_KEY = 'droppr_gallery_prefs';
+
+        function loadPrefs() {
+            try {
+                return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+            } catch { return {}; }
+        }
+
+        function savePrefs(prefs) {
+            try {
+                localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...prefs }));
+            } catch {}
+        }
+
+        function getTheme() {
+            const prefs = loadPrefs();
+            return prefs.theme || 'dark';
+        }
+
+        function setTheme(theme) {
+            const isDark = theme === 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            if (els.themeToggle) {
+                els.themeToggle.textContent = isDark ? '🌙' : '☀️';
+                els.themeToggle.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+            }
+            savePrefs({ theme });
+        }
+
+        function toggleTheme() {
+            const current = getTheme();
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        function initTheme() {
+            const theme = getTheme();
+            setTheme(theme);
+            if (els.themeToggle) {
+                els.themeToggle.addEventListener('click', toggleTheme);
+            }
+        }
+
+        // Initialize theme immediately
+        initTheme();
 
         function fmtInt(n) {
             if (n === null || n === undefined) return '—';
