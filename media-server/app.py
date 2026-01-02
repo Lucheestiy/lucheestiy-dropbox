@@ -27,6 +27,7 @@ import time
 import subprocess
 import shutil
 import hashlib
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from urllib.parse import quote
 
@@ -161,6 +162,12 @@ ALIASES_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ALIASES_DB_TIMEOUT_SEC
 
 VIDEO_META_DB_PATH = os.environ.get("DROPPR_VIDEO_META_DB_PATH", "/database/droppr-video-meta.sqlite3")
 VIDEO_META_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_VIDEO_META_DB_TIMEOUT_SECONDS", "10"))
+VIDEO_META_LOCK_DIR = os.environ.get("DROPPR_VIDEO_META_LOCK_DIR", "/database/video-meta-locks")
+VIDEO_META_FFPROBE_TIMEOUT_SECONDS = int(os.environ.get("DROPPR_VIDEO_META_FFPROBE_TIMEOUT_SECONDS", "25"))
+VIDEO_META_MAX_CONCURRENCY = int(os.environ.get("DROPPR_VIDEO_META_MAX_CONCURRENCY", "2"))
+_video_meta_sema = threading.BoundedSemaphore(max(1, VIDEO_META_MAX_CONCURRENCY))
+
+os.makedirs(VIDEO_META_LOCK_DIR, exist_ok=True)
 
 _last_retention_sweep_at: float = 0.0
 _analytics_db_ready: bool = False
@@ -493,6 +500,378 @@ def _video_meta_conn():
         conn.close()
 
 
+def _sanitize_header_value(value: str) -> str:
+    return str(value).replace("\r", " ").replace("\n", " ").strip()
+
+
+def _parse_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _positive_int(value) -> int | None:
+    out = _parse_int(value)
+    if out is None or out <= 0:
+        return None
+    return out
+
+
+def _positive_float(value) -> float | None:
+    out = _parse_float(value)
+    if out is None or out <= 0:
+        return None
+    return out
+
+
+def _parse_ratio(value: str | None) -> tuple[float, float] | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if ":" in raw:
+        parts = raw.split(":", 1)
+    elif "/" in raw:
+        parts = raw.split("/", 1)
+    else:
+        return None
+    num = _positive_float(parts[0])
+    den = _positive_float(parts[1])
+    if not num or not den:
+        return None
+    return num, den
+
+
+def _parse_fps(value: str | None) -> float | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw or raw == "0/0":
+        return None
+    if "/" in raw:
+        parts = raw.split("/", 1)
+        num = _positive_float(parts[0])
+        den = _positive_float(parts[1])
+        if not num or not den:
+            return None
+        return num / den
+    return _positive_float(raw)
+
+
+def _parse_iso8601_to_unix(value: str | None) -> int | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp())
+
+
+def _strip_empty(meta: dict) -> dict:
+    return {k: v for k, v in meta.items() if v is not None and v != "" and v != {}}
+
+
+def _extract_ffprobe_meta(payload: dict) -> dict | None:
+    if not payload or not isinstance(payload, dict):
+        return None
+
+    streams = payload.get("streams")
+    if not isinstance(streams, list):
+        streams = []
+    fmt = payload.get("format") if isinstance(payload.get("format"), dict) else {}
+
+    video_stream = next((s for s in streams if isinstance(s, dict) and s.get("codec_type") == "video"), None)
+    audio_stream = next((s for s in streams if isinstance(s, dict) and s.get("codec_type") == "audio"), None)
+
+    duration = _positive_float(fmt.get("duration"))
+    if duration is None and isinstance(video_stream, dict):
+        duration = _positive_float(video_stream.get("duration"))
+
+    size = _positive_int(fmt.get("size"))
+
+    video = None
+    if video_stream:
+        width = _positive_int(video_stream.get("width"))
+        height = _positive_int(video_stream.get("height"))
+        display_width = width
+        display_height = height
+
+        sar = video_stream.get("sample_aspect_ratio") or video_stream.get("sar")
+        sar_ratio = _parse_ratio(sar)
+        if sar_ratio and width and height:
+            num, den = sar_ratio
+            if num and den and num != den:
+                display_width = int(round(width * (num / den)))
+
+        rotation = None
+        tags = video_stream.get("tags")
+        if isinstance(tags, dict):
+            rotation_val = _parse_float(tags.get("rotate"))
+            if rotation_val is not None:
+                rotation = int(round(rotation_val))
+        if rotation is None:
+            side_data = video_stream.get("side_data_list")
+            if isinstance(side_data, list):
+                for item in side_data:
+                    if not isinstance(item, dict):
+                        continue
+                    if "rotation" in item:
+                        rotation_val = _parse_float(item.get("rotation"))
+                        if rotation_val is not None:
+                            rotation = int(round(rotation_val))
+                        break
+
+        if rotation is not None:
+            rotation = rotation % 360
+            if rotation in {90, 270}:
+                display_width, display_height = display_height, display_width
+
+        fps = _parse_fps(video_stream.get("avg_frame_rate")) or _parse_fps(video_stream.get("r_frame_rate"))
+
+        video = _strip_empty(
+            {
+                "codec": video_stream.get("codec_name"),
+                "width": width,
+                "height": height,
+                "display_width": display_width,
+                "display_height": display_height,
+                "fps": fps,
+            }
+        )
+
+    audio = None
+    if audio_stream:
+        audio = _strip_empty(
+            {
+                "codec": audio_stream.get("codec_name"),
+                "channels": _positive_int(audio_stream.get("channels")),
+                "sample_rate": _positive_int(audio_stream.get("sample_rate")),
+                "channel_layout": audio_stream.get("channel_layout"),
+            }
+        )
+
+    meta = _strip_empty(
+        {
+            "duration": duration,
+            "size": size,
+            "video": video,
+            "audio": audio,
+        }
+    )
+    return meta or None
+
+
+def _ffprobe_video_meta(src_url: str, headers: dict | None = None) -> dict | None:
+    cmd = ["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams"]
+    if headers:
+        header_lines = []
+        for key, value in headers.items():
+            if value is None:
+                continue
+            header_lines.append(f"{_sanitize_header_value(key)}: {_sanitize_header_value(value)}")
+        if header_lines:
+            cmd += ["-headers", "\r\n".join(header_lines) + "\r\n"]
+    cmd += ["-i", src_url]
+
+    with _video_meta_sema:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=VIDEO_META_FFPROBE_TIMEOUT_SECONDS,
+        )
+
+    if result.returncode != 0:
+        err = result.stderr.decode(errors="replace").strip()
+        raise RuntimeError(err or "ffprobe failed")
+
+    raw = result.stdout.decode(errors="replace")
+    data = json.loads(raw) if raw.strip() else {}
+    return _extract_ffprobe_meta(data)
+
+
+def _video_meta_lock_path(db_path: str) -> str:
+    digest = hashlib.sha256(db_path.encode()).hexdigest()
+    return os.path.join(VIDEO_META_LOCK_DIR, f"{digest}.lock")
+
+
+def _fetch_video_meta_row(conn: sqlite3.Connection, db_path: str):
+    return conn.execute(
+        """
+        SELECT
+            path,
+            status,
+            action,
+            error,
+            uploaded_at,
+            processed_at,
+            original_size,
+            processed_size,
+            original_meta_json,
+            processed_meta_json
+        FROM video_meta
+        WHERE path = ?
+        LIMIT 1
+        """,
+        (db_path,),
+    ).fetchone()
+
+
+def _needs_video_meta_refresh(
+    row: sqlite3.Row | None,
+    current_size: int | None,
+    current_uploaded_at: int | None,
+    force: bool,
+) -> bool:
+    if force:
+        return True
+    if not row:
+        return True
+    if str(row["status"] or "") != "ready":
+        return True
+    if not row["original_meta_json"] and not row["processed_meta_json"]:
+        return True
+    if current_size and row["original_size"] and int(row["original_size"]) != int(current_size):
+        return True
+    if current_uploaded_at and row["uploaded_at"] and int(row["uploaded_at"]) != int(current_uploaded_at):
+        return True
+    return False
+
+
+def _upsert_video_meta(
+    *,
+    db_path: str,
+    status: str,
+    action: str | None,
+    error: str | None,
+    uploaded_at: int | None,
+    processed_at: int | None,
+    original_size: int | None,
+    processed_size: int | None,
+    original_meta: dict | None,
+    processed_meta: dict | None,
+) -> None:
+    original_json = json.dumps(original_meta) if original_meta else None
+    processed_json = json.dumps(processed_meta) if processed_meta else None
+
+    with _video_meta_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO video_meta (
+                path,
+                status,
+                action,
+                error,
+                uploaded_at,
+                processed_at,
+                original_size,
+                processed_size,
+                original_meta_json,
+                processed_meta_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+                status = excluded.status,
+                action = excluded.action,
+                error = excluded.error,
+                uploaded_at = excluded.uploaded_at,
+                processed_at = excluded.processed_at,
+                original_size = excluded.original_size,
+                processed_size = excluded.processed_size,
+                original_meta_json = excluded.original_meta_json,
+                processed_meta_json = excluded.processed_meta_json
+            """,
+            (
+                db_path,
+                status,
+                action,
+                error,
+                uploaded_at,
+                processed_at,
+                original_size,
+                processed_size,
+                original_json,
+                processed_json,
+            ),
+        )
+
+
+def _ensure_video_meta_record(
+    *,
+    db_path: str,
+    src_url: str,
+    current_size: int | None,
+    current_modified: str | None,
+    headers: dict | None = None,
+    force: bool = False,
+):
+    lock_path = _video_meta_lock_path(db_path)
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+
+        with _video_meta_conn() as conn:
+            row = _fetch_video_meta_row(conn, db_path)
+
+        uploaded_at = _parse_iso8601_to_unix(current_modified)
+        if not uploaded_at and row and row["uploaded_at"]:
+            uploaded_at = int(row["uploaded_at"])
+        if not uploaded_at:
+            uploaded_at = int(time.time())
+
+        if not _needs_video_meta_refresh(row, current_size, uploaded_at, force):
+            return row
+
+        now = int(time.time())
+        try:
+            meta = _ffprobe_video_meta(src_url, headers=headers)
+            if not meta:
+                raise RuntimeError("ffprobe returned no metadata")
+
+            original_size = current_size or meta.get("size")
+            _upsert_video_meta(
+                db_path=db_path,
+                status="ready",
+                action=None,
+                error=None,
+                uploaded_at=uploaded_at,
+                processed_at=now,
+                original_size=original_size,
+                processed_size=None,
+                original_meta=meta,
+                processed_meta=None,
+            )
+        except Exception as e:
+            err = str(e).strip()
+            if len(err) > 2000:
+                err = err[:2000]
+            _upsert_video_meta(
+                db_path=db_path,
+                status="error",
+                action=None,
+                error=err or "ffprobe failed",
+                uploaded_at=uploaded_at,
+                processed_at=now,
+                original_size=current_size,
+                processed_size=None,
+                original_meta=None,
+                processed_meta=None,
+            )
+
+        with _video_meta_conn() as conn:
+            return _fetch_video_meta_row(conn, db_path)
+
+
 MAX_ALIAS_DEPTH = 10
 
 
@@ -727,6 +1106,23 @@ def _fetch_public_share_json(share_hash: str, subpath: str | None = None) -> dic
     resp = requests.get(url, timeout=10)
     if resp.status_code == 404:
         return None
+    resp.raise_for_status()
+    data = resp.json()
+    return data if isinstance(data, dict) else None
+
+
+def _fetch_filebrowser_resource(path: str, token: str) -> dict | None:
+    safe_path = _safe_root_path(path)
+    if not safe_path:
+        return None
+
+    encoded = quote(safe_path.lstrip("/"), safe="/")
+    url = f"{FILEBROWSER_BASE_URL}/api/resources/{encoded}"
+    resp = requests.get(url, headers={"X-Auth": token}, timeout=10)
+    if resp.status_code == 404:
+        return None
+    if resp.status_code in {401, 403}:
+        raise PermissionError("Unauthorized")
     resp.raise_for_status()
     data = resp.json()
     return data if isinstance(data, dict) else None
@@ -968,10 +1364,25 @@ def _get_cache_path(share_hash: str, filename: str) -> str:
     return os.path.join(CACHE_DIR, f"{hashed_name}.jpg")
 
 
-def _ffmpeg_thumbnail_cmd(*, src_url: str, dst_path: str, seek_seconds: int | None) -> list[str]:
+def _get_files_cache_path(path: str, size: int | None, modified: str | None) -> str:
+    cache_key = f"{path}|{size or ''}|{modified or ''}"
+    return _get_cache_path("__files__", cache_key)
+
+
+def _ffmpeg_thumbnail_cmd(
+    *,
+    src_url: str,
+    dst_path: str,
+    seek_seconds: int | None,
+    headers: dict[str, str] | None = None,
+) -> list[str]:
     cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-threads", "1"]
     if seek_seconds is not None:
         cmd += ["-ss", str(seek_seconds)]
+    if headers:
+        header_lines = "".join(f"{k}: {v}\r\n" for k, v in headers.items() if v)
+        if header_lines:
+            cmd += ["-headers", header_lines]
     cmd += [
         "-i",
         src_url,
@@ -1571,28 +1982,15 @@ def share_video_meta(share_hash: str, filename: str):
     db_path = "/" + safe.lstrip("/")
     row = None
     try:
-        with _video_meta_conn() as conn:
-            row = conn.execute(
-                """
-                SELECT
-                    path,
-                    status,
-                    action,
-                    error,
-                    uploaded_at,
-                    processed_at,
-                    original_size,
-                    processed_size,
-                    original_meta_json,
-                    processed_meta_json
-                FROM video_meta
-                WHERE path = ?
-                LIMIT 1
-                """,
-                (db_path,),
-            ).fetchone()
+        src_url = f"{FILEBROWSER_PUBLIC_DL_API}/{source_hash}/{quote(safe, safe='/')}?inline=true"
+        row = _ensure_video_meta_record(
+            db_path=db_path,
+            src_url=src_url,
+            current_size=current_size,
+            current_modified=current_modified,
+        )
     except Exception as e:
-        app.logger.error("Failed to read video meta for %s: %s", db_path, e)
+        app.logger.error("Failed to build video meta for %s: %s", db_path, e)
         return jsonify({"error": "Failed to read video metadata"}), 500
 
     if not row:
@@ -1622,13 +2020,14 @@ def share_video_meta(share_hash: str, filename: str):
     except Exception:
         processed_meta = None
 
+    recorded = bool(original_meta or processed_meta)
     resp = jsonify(
         {
             "share": share_hash,
             "path": safe,
             "name": name or os.path.basename(safe),
             "current": {"size": current_size, "modified": current_modified},
-            "recorded": True,
+            "recorded": recorded,
             "status": str(row["status"]),
             "action": (str(row["action"]) if row["action"] is not None else None),
             "error": (str(row["error"]) if row["error"] is not None else None),
@@ -1808,29 +2207,37 @@ def droppr_video_meta():
     if not safe_path or safe_path == "/":
         return jsonify({"error": "Missing or invalid path"}), 400
 
+    ext = os.path.splitext(safe_path)[1].lstrip(".").lower()
+    if ext not in VIDEO_EXTS:
+        return jsonify({"error": "Unsupported video type"}), 415
+
+    meta = None
     try:
-        with _video_meta_conn() as conn:
-            row = conn.execute(
-                """
-                SELECT
-                    path,
-                    status,
-                    action,
-                    error,
-                    uploaded_at,
-                    processed_at,
-                    original_size,
-                    processed_size,
-                    original_meta_json,
-                    processed_meta_json
-                FROM video_meta
-                WHERE path = ?
-                LIMIT 1
-                """,
-                (safe_path,),
-            ).fetchone()
+        meta = _fetch_filebrowser_resource(safe_path, token)
+    except PermissionError:
+        return jsonify({"error": "Unauthorized"}), 401
     except Exception as e:
-        app.logger.error("Failed to read video meta for %s: %s", safe_path, e)
+        app.logger.error("Failed to read file metadata for %s: %s", safe_path, e)
+        return jsonify({"error": "Failed to read file metadata"}), 502
+
+    if not meta or isinstance(meta.get("items"), list) or parse_bool(meta.get("isDir")):
+        return jsonify({"error": "File not found"}), 404
+
+    current_size = int(meta.get("size") or 0) or None
+    current_modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
+
+    try:
+        encoded_path = quote(safe_path.lstrip("/"), safe="/")
+        src_url = f"{FILEBROWSER_BASE_URL}/api/raw/{encoded_path}"
+        row = _ensure_video_meta_record(
+            db_path=safe_path,
+            src_url=src_url,
+            current_size=current_size,
+            current_modified=current_modified,
+            headers={"X-Auth": token},
+        )
+    except Exception as e:
+        app.logger.error("Failed to build video meta for %s: %s", safe_path, e)
         return jsonify({"error": "Failed to read video metadata"}), 500
 
     if not row:
@@ -1866,6 +2273,115 @@ def droppr_video_meta():
     )
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+
+@app.route("/api/droppr/preview")
+def droppr_preview():
+    token = _get_auth_token()
+    if not token:
+        return jsonify({"error": "Missing auth token"}), 401
+
+    try:
+        status = _validate_filebrowser_admin(token)
+    except Exception as e:
+        return jsonify({"error": f"Failed to validate auth: {e}"}), 502
+
+    if status is not None:
+        return jsonify({"error": "Unauthorized"}), status
+
+    raw_path = request.args.get("path") or request.args.get("p")
+    safe_path = _safe_root_path(raw_path)
+    if not safe_path or safe_path == "/":
+        return jsonify({"error": "Missing or invalid path"}), 400
+
+    ext = os.path.splitext(safe_path)[1].lstrip(".").lower()
+    is_video = ext in VIDEO_EXTS
+    is_image = ext in IMAGE_EXTS
+    if not is_video and not is_image:
+        return jsonify({"error": "Unsupported preview type"}), 415
+
+    try:
+        meta = _fetch_filebrowser_resource(safe_path, token)
+    except PermissionError:
+        return jsonify({"error": "Unauthorized"}), 401
+    except Exception as e:
+        app.logger.error("Failed to read file metadata for %s: %s", safe_path, e)
+        return jsonify({"error": "Failed to read file metadata"}), 502
+
+    if not meta or isinstance(meta.get("items"), list) or parse_bool(meta.get("isDir")):
+        return jsonify({"error": "File not found"}), 404
+
+    size = int(meta.get("size") or 0) or None
+    modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
+
+    cache_path = _get_files_cache_path(safe_path, size, modified)
+    lock_path = cache_path + ".lock"
+
+    if os.path.exists(cache_path):
+        try:
+            os.utime(cache_path, None)
+        except OSError:
+            pass
+        with open(cache_path, "rb") as f:
+            resp = Response(f.read(), mimetype="image/jpeg")
+            resp.headers["Cache-Control"] = "private, max-age=86400"
+            return resp
+
+    try:
+        with open(lock_path, "w") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            try:
+                if os.path.exists(cache_path):
+                    with open(cache_path, "rb") as f:
+                        resp = Response(f.read(), mimetype="image/jpeg")
+                        resp.headers["Cache-Control"] = "private, max-age=86400"
+                        return resp
+
+                encoded_path = quote(safe_path.lstrip("/"), safe="/")
+                src_url = f"{FILEBROWSER_BASE_URL}/api/raw/{encoded_path}"
+                headers = {"X-Auth": token}
+
+                with _thumb_sema:
+                    cmd = _ffmpeg_thumbnail_cmd(
+                        src_url=src_url,
+                        dst_path=cache_path,
+                        seek_seconds=(1 if is_video else None),
+                        headers=headers,
+                    )
+                    result = subprocess.run(
+                        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=THUMB_FFMPEG_TIMEOUT_SECONDS
+                    )
+
+                    if result.returncode != 0 and is_video:
+                        cmd = _ffmpeg_thumbnail_cmd(
+                            src_url=src_url, dst_path=cache_path, seek_seconds=0, headers=headers
+                        )
+                        result = subprocess.run(
+                            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=THUMB_FFMPEG_TIMEOUT_SECONDS
+                        )
+
+                if result.returncode != 0:
+                    app.logger.error(
+                        "ffmpeg failed for %s: %s", safe_path, result.stderr.decode(errors="replace")
+                    )
+                    return jsonify({"error": "Thumbnail generation failed"}), 500
+
+                if os.path.exists(cache_path):
+                    with open(cache_path, "rb") as f:
+                        resp = Response(f.read(), mimetype="image/jpeg")
+                        resp.headers["Cache-Control"] = "private, max-age=86400"
+                        return resp
+                else:
+                    return jsonify({"error": "Thumbnail not generated"}), 500
+
+            finally:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+    except subprocess.TimeoutExpired:
+        app.logger.error("ffmpeg timed out for %s", safe_path)
+        return jsonify({"error": "Thumbnail generation timed out"}), 504
+    except Exception as e:
+        app.logger.error("Error generating thumbnail for %s: %s", safe_path, e)
+        return jsonify({"error": "Internal Error"}), 500
 
 
 @app.route("/api/analytics/config")

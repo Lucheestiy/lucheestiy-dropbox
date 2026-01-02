@@ -2,7 +2,7 @@
   if (window.__dropprPanelBooted) return;
   window.__dropprPanelBooted = true;
 
-  var DROPPR_PANEL_VERSION = "25";
+  var DROPPR_PANEL_VERSION = "26";
   var ANALYTICS_BTN_ID = "droppr-analytics-btn";
   var ANALYTICS_STYLE_ID = "droppr-analytics-style";
   var SHARE_EXPIRE_STYLE_ID = "droppr-share-expire-style";
@@ -17,6 +17,10 @@
   var VIDEO_META_INLINE_ID = "droppr-video-meta-inline";
   var VIDEO_ROW_DETAILS_CLASS = "droppr-video-row-details";
   var VIDEO_DETAILS_ROW_CLASS = "droppr-video-details-row";
+  var VIDEO_THUMB_STYLE_ID = "droppr-video-thumb-style";
+  var VIDEO_THUMB_CLASS = "droppr-video-thumb";
+  var VIDEO_THUMB_WRAP_CLASS = "droppr-video-thumb-wrap";
+  var VIDEO_THUMB_HIDE_CLASS = "droppr-video-thumb-hide";
   var DEBUG_BADGE_ID = "droppr-debug-badge";
   var THEME_TOGGLE_BTN_ID = "droppr-theme-toggle";
   var THEME_PREFS_KEY = "droppr_gallery_prefs";
@@ -542,6 +546,32 @@
     document.head.appendChild(style);
   }
 
+  function ensureVideoThumbStyles() {
+    if (document.getElementById(VIDEO_THUMB_STYLE_ID)) return;
+
+    var style = document.createElement("style");
+    style.id = VIDEO_THUMB_STYLE_ID;
+    style.textContent =
+      "." + VIDEO_THUMB_WRAP_CLASS + " {\n" +
+      "  position: relative;\n" +
+      "  overflow: hidden;\n" +
+      "  border-radius: 6px;\n" +
+      "}\n" +
+      "." + VIDEO_THUMB_CLASS + " {\n" +
+      "  position: absolute;\n" +
+      "  inset: 0;\n" +
+      "  width: 100%;\n" +
+      "  height: 100%;\n" +
+      "  object-fit: cover;\n" +
+      "  border-radius: inherit;\n" +
+      "  display: block;\n" +
+      "}\n" +
+      "." + VIDEO_THUMB_HIDE_CLASS + " {\n" +
+      "  opacity: 0 !important;\n" +
+      "}\n";
+    document.head.appendChild(style);
+  }
+
   function ensureVideoMetaPanel() {
     var existing = document.getElementById(VIDEO_META_PANEL_ID);
     if (existing) return existing;
@@ -579,11 +609,11 @@
     var units = ["B", "KB", "MB", "GB", "TB"];
     var v = bytes;
     var i = 0;
-    while (v >= 1024 && i < units.length - 1) {
-      v /= 1024;
+    while (v >= 1000 && i < units.length - 1) {
+      v /= 1000;
       i++;
     }
-    var digits = v >= 100 || i === 0 ? 0 : v >= 10 ? 1 : 2;
+    var digits = i === 0 ? 0 : 1;
     return v.toFixed(digits) + " " + units[i];
   }
 
@@ -660,7 +690,125 @@
 
   function isLikelyVideoPath(path) {
     var s = String(path || "").toLowerCase();
-    return s.endsWith(".mp4") || s.endsWith(".mov") || s.endsWith(".m4v");
+    return (
+      s.endsWith(".mp4") ||
+      s.endsWith(".mov") ||
+      s.endsWith(".m4v") ||
+      s.endsWith(".webm") ||
+      s.endsWith(".mkv") ||
+      s.endsWith(".avi")
+    );
+  }
+
+  function buildDropprPreviewUrl(path) {
+    return "/api/droppr/preview?path=" + encodeURIComponent(String(path || ""));
+  }
+
+  function isActionIcon(el) {
+    if (!el || !el.closest) return false;
+    return !!el.closest(
+      "button, .action, .v-btn, .v-btn--icon, .v-list-item__action, .list-item__action, .v-menu, .menu, .dropdown"
+    );
+  }
+
+  function isLikelyFileIcon(el) {
+    if (!el) return false;
+    var cls = String(el.className || "");
+    var txt = String(el.textContent || "").trim().toLowerCase();
+    if (/checkbox|check|menu|share|download|delete|more/.test(cls)) return false;
+    if (/checkbox|check|menu|share|download|delete|more/.test(txt)) return false;
+    if (/mdi-file|mdi-video|mdi-movie|mdi-film|mdi-play/i.test(cls)) return true;
+    if (txt === "movie" || txt === "videocam" || txt === "play_circle_filled") return true;
+    return false;
+  }
+
+  function findFileIconElement(rowEl) {
+    if (!rowEl || !rowEl.querySelectorAll) return null;
+
+    var icons = rowEl.querySelectorAll("i, svg, .v-icon, .material-icons");
+    var fallback = null;
+    for (var i = 0; i < icons.length; i++) {
+      var icon = icons[i];
+      if (!icon) continue;
+      if (isActionIcon(icon)) continue;
+      if (!fallback) fallback = icon;
+      if (isLikelyFileIcon(icon)) return icon;
+    }
+    return fallback;
+  }
+
+  function findThumbContainer(rowEl, iconEl, nameEl) {
+    if (!iconEl) return null;
+    var container = null;
+    try {
+      if (iconEl.closest) {
+        container = iconEl.closest(
+          ".v-list-item__icon, .item__icon, .file-icon, .icon, .preview, .v-avatar, .v-image"
+        );
+      }
+    } catch (e) {
+      container = null;
+    }
+
+    if (!container) container = iconEl.parentElement || iconEl;
+    if (container && nameEl && container.contains(nameEl)) {
+      var parent = iconEl.parentElement;
+      if (parent && parent !== container && !parent.contains(nameEl)) {
+        container = parent;
+      } else {
+        return null;
+      }
+    }
+    if (!container || container === rowEl) return null;
+    return container;
+  }
+
+  function applyVideoThumbnail(rowEl, path, nameEl) {
+    if (!rowEl || !path) return false;
+
+    var iconEl = findFileIconElement(rowEl);
+    if (!iconEl) return false;
+
+    var container = findThumbContainer(rowEl, iconEl, nameEl);
+    if (!container || !container.querySelector) return false;
+
+    ensureVideoThumbStyles();
+
+    var existing = container.querySelector("." + VIDEO_THUMB_CLASS);
+    if (existing && existing.dataset && existing.dataset.failed === "1") return false;
+
+    var url = buildDropprPreviewUrl(path);
+    if (existing && existing.dataset && existing.dataset.src === url) return false;
+
+    try {
+      if (container.classList) container.classList.add(VIDEO_THUMB_WRAP_CLASS);
+      if (iconEl.classList) iconEl.classList.add(VIDEO_THUMB_HIDE_CLASS);
+    } catch (e1) {
+      // ignore
+    }
+
+    var img = existing;
+    if (!img) {
+      img = document.createElement("img");
+      img.className = VIDEO_THUMB_CLASS;
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.addEventListener("error", function () {
+        if (img.dataset) img.dataset.failed = "1";
+        try { img.style.display = "none"; } catch (e2) {}
+        try { if (iconEl && iconEl.classList) iconEl.classList.remove(VIDEO_THUMB_HIDE_CLASS); } catch (e3) {}
+      });
+      try {
+        container.insertBefore(img, container.firstChild);
+      } catch (e4) {
+        try { container.appendChild(img); } catch (e5) {}
+      }
+    }
+
+    if (img.dataset) img.dataset.src = url;
+    img.src = url;
+    return true;
   }
 
   function isFilesPage() {
@@ -1162,6 +1310,7 @@
     if (!isFilesPage()) return;
 
     ensureVideoMetaStyles();
+    ensureVideoThumbStyles();
 
     var layout = getFilesListingLayout();
     var root = document.getElementById("listing") || document.getElementById("app") || document.body;
@@ -1199,6 +1348,8 @@
 
       var fullPath = extractVideoPathFromRow(itemEl, nameText);
       if (!fullPath || !isLikelyVideoPath(fullPath)) continue;
+
+      applyVideoThumbnail(itemEl, fullPath, nameEl);
 
       var box = ensureVideoRowDetailsBox(itemEl, nameEl);
       if (!box) continue;
@@ -1724,6 +1875,8 @@
       var shareHash = extractShareHashFromHref(shareAnchor.getAttribute("href"));
       if (!shareHash) continue;
 
+      rewriteShareLinksToStream(row, shareHash);
+
       var sharePath = String(shareAnchor.textContent || "").trim();
 
       var btn = document.createElement("button");
@@ -1845,10 +1998,10 @@
         if (!copyBtn || !copyBtn.parentNode) continue;
 
         var host = copyBtn.parentNode;
-        if (host.querySelector && host.querySelector("." + STREAM_SHARE_BTN_CLASS)) continue;
-
         var shareHash = findShareHashNearEl(copyBtn);
         if (!shareHash) continue;
+        rewriteShareLinksToStream(dialog, shareHash);
+        if (host.querySelector && host.querySelector("." + STREAM_SHARE_BTN_CLASS)) continue;
 
         var streamBtn = copyBtn.cloneNode(true);
         if (streamBtn.classList && streamBtn.classList.remove) streamBtn.classList.remove("copy-clipboard");
@@ -1865,7 +2018,6 @@
             e.stopPropagation();
 
             var streamUrl = buildStreamUrl(hash);
-            var shareUrl = buildShareUrl(hash);
 
             showAutoShareModal({
               title: "Stream Gallery link",
@@ -1873,8 +2025,6 @@
               urlLabel: "Stream Gallery (best for big videos):",
               url: streamUrl,
               openUrl: streamUrl,
-              streamLabel: "Standard share link (gallery):",
-              streamUrl: shareUrl,
               note: "Tip: If iOS video scrubbing is slow, use the Stream link.",
               autoCopy: true,
               autoCopyValue: streamUrl,
@@ -1988,7 +2138,6 @@
             if (!hash) throw new Error("Share response missing hash");
 
             var streamUrl = buildStreamUrl(hash);
-            var shareUrl = buildShareUrl(hash);
 
             showAutoShareModal({
               title: "Stream link ready",
@@ -1996,8 +2145,6 @@
               urlLabel: "Stream Gallery (best for big videos):",
               url: streamUrl,
               openUrl: streamUrl,
-              streamLabel: "Standard share link (gallery):",
-              streamUrl: shareUrl,
               note: "Recipients can view without logging in.",
               autoCopy: true,
               autoCopyValue: streamUrl,
@@ -2242,6 +2389,43 @@
     return window.location.origin + "/stream/" + shareHash;
   }
 
+  function rewriteShareLinksToStream(rootEl, shareHash) {
+    if (!rootEl || !shareHash) return;
+    var streamUrl = buildStreamUrl(shareHash);
+    var attrNames = ["data-clipboard-text", "data-clipboardText", "data-copy", "data-text"];
+    var attrTargets = rootEl.querySelectorAll
+      ? rootEl.querySelectorAll("[data-clipboard-text],[data-clipboardText],[data-copy],[data-text]")
+      : [];
+
+    for (var i = 0; i < attrTargets.length; i++) {
+      var el = attrTargets[i];
+      if (!el || !el.getAttribute) continue;
+      for (var a = 0; a < attrNames.length; a++) {
+        var attr = attrNames[a];
+        var val = el.getAttribute(attr);
+        if (extractShareHashFromText(val) !== shareHash) continue;
+        el.setAttribute(attr, streamUrl);
+      }
+    }
+
+    var inputs = rootEl.querySelectorAll ? rootEl.querySelectorAll("input, textarea") : [];
+    for (var j = 0; j < inputs.length; j++) {
+      var input = inputs[j];
+      if (!input) continue;
+      if (extractShareHashFromText(input.value) !== shareHash) continue;
+      input.value = streamUrl;
+    }
+
+    var anchors = rootEl.querySelectorAll ? rootEl.querySelectorAll("a[href]") : [];
+    for (var k = 0; k < anchors.length; k++) {
+      var anchor = anchors[k];
+      if (!anchor || !anchor.getAttribute) continue;
+      var href = anchor.getAttribute("href");
+      if (extractShareHashFromText(href) !== shareHash) continue;
+      anchor.setAttribute("href", streamUrl);
+    }
+  }
+
   function findShareHashNearEl(el) {
     if (!el) return null;
 
@@ -2302,6 +2486,23 @@
     ensureAutoShareStyles();
     dismissAutoShareModal();
 
+    var shareHash =
+      extractShareHashFromText(opts.url) ||
+      extractShareHashFromText(opts.streamUrl) ||
+      extractShareHashFromText(opts.openUrl);
+    var primaryUrl = opts.url || "";
+    if (!primaryUrl && opts.streamUrl) primaryUrl = opts.streamUrl;
+    if (!primaryUrl && opts.openUrl) primaryUrl = opts.openUrl;
+    if (shareHash) primaryUrl = buildStreamUrl(shareHash);
+
+    var openUrl = opts.openUrl || primaryUrl;
+    if (shareHash) openUrl = buildStreamUrl(shareHash);
+
+    var urlLabel = opts.urlLabel;
+    if (!urlLabel && shareHash && primaryUrl) {
+      urlLabel = "Stream Gallery (best for big videos):";
+    }
+
     var modal = document.createElement("div");
     modal.id = AUTO_SHARE_MODAL_ID;
 
@@ -2333,13 +2534,13 @@
     var body = document.createElement("div");
     body.className = "body";
 
-    if (opts.urlLabel) {
-      var urlLabel = document.createElement("div");
-      urlLabel.style.fontSize = "0.8rem";
-      urlLabel.style.color = "var(--text-muted, #888)";
-      urlLabel.style.marginBottom = "0.35rem";
-      urlLabel.textContent = String(opts.urlLabel || "");
-      body.appendChild(urlLabel);
+    if (urlLabel) {
+      var urlLabelEl = document.createElement("div");
+      urlLabelEl.style.fontSize = "0.8rem";
+      urlLabelEl.style.color = "var(--text-muted, #888)";
+      urlLabelEl.style.marginBottom = "0.35rem";
+      urlLabelEl.textContent = String(urlLabel || "");
+      body.appendChild(urlLabelEl);
     }
 
     var row = document.createElement("div");
@@ -2348,7 +2549,7 @@
     var input = document.createElement("input");
     input.type = "text";
     input.readOnly = true;
-    input.value = opts.url || "";
+    input.value = primaryUrl || "";
     input.addEventListener("focus", function () {
       try {
         input.select();
@@ -2387,9 +2588,9 @@
     openBtn.textContent = "Open";
     openBtn.addEventListener("click", function () {
       try {
-        window.open(opts.openUrl || opts.url, "_blank", "noopener");
+        window.open(openUrl || primaryUrl, "_blank", "noopener");
       } catch (e) {
-        window.location.href = opts.openUrl || opts.url;
+        window.location.href = openUrl || primaryUrl;
       }
     });
 
@@ -2398,59 +2599,6 @@
     row.appendChild(openBtn);
 
     body.appendChild(row);
-
-    // Stream Gallery row (for video-optimized player)
-    if (opts.streamUrl) {
-      var streamRow = document.createElement("div");
-      streamRow.className = "row";
-      streamRow.style.marginTop = "0.75rem";
-
-      var streamLabel = document.createElement("div");
-      streamLabel.style.fontSize = "0.8rem";
-      streamLabel.style.color = "var(--text-muted, #888)";
-      streamLabel.style.marginBottom = "0.35rem";
-      streamLabel.textContent = opts.streamLabel || "Stream Gallery (optimized for large videos):";
-      
-      var streamInput = document.createElement("input");
-      streamInput.type = "text";
-      streamInput.readOnly = true;
-      streamInput.value = opts.streamUrl;
-      streamInput.addEventListener("focus", function () {
-        try { streamInput.select(); } catch (e) {}
-      });
-
-      var streamCopyBtn = document.createElement("button");
-      streamCopyBtn.type = "button";
-      streamCopyBtn.className = "btn";
-      streamCopyBtn.textContent = "Copy";
-      streamCopyBtn.addEventListener("click", function () {
-        copyText(streamInput.value)
-          .then(function () {
-            streamCopyBtn.textContent = "Copied";
-            setTimeout(function () {
-              if (document.body.contains(streamCopyBtn)) streamCopyBtn.textContent = "Copy";
-            }, 1200);
-          })
-          .catch(function () {
-            try { streamInput.focus(); streamInput.select(); } catch (e) {}
-          });
-      });
-
-      var streamOpenBtn = document.createElement("button");
-      streamOpenBtn.type = "button";
-      streamOpenBtn.className = "btn secondary";
-      streamOpenBtn.textContent = "Open";
-      streamOpenBtn.addEventListener("click", function () {
-        try { window.open(opts.streamUrl, "_blank", "noopener"); }
-        catch (e) { window.location.href = opts.streamUrl; }
-      });
-
-      body.appendChild(streamLabel);
-      streamRow.appendChild(streamInput);
-      streamRow.appendChild(streamCopyBtn);
-      streamRow.appendChild(streamOpenBtn);
-      body.appendChild(streamRow);
-    }
 
     var note = document.createElement("div");
     note.className = "note";
@@ -2468,8 +2616,8 @@
       // ignore
     }
 
-    if (opts.autoCopy && opts.url) {
-      var valueToCopy = opts.autoCopyValue || opts.url;
+    if (opts.autoCopy && primaryUrl) {
+      var valueToCopy = opts.autoCopyValue || primaryUrl;
       copyText(valueToCopy)
         .then(function () {
           copyBtn.textContent = "Copied";
@@ -2758,14 +2906,14 @@
 
     createShare(pathEncoded)
       .then(function (resp) {
-        var shareUrl = window.location.origin + "/api/public/dl/" + resp.hash;
+        var streamUrl = window.location.origin + "/stream/" + resp.hash;
         var fileLabel = decodeURIComponent(String(pathEncoded).split("/").pop() || "");
         showAutoShareModal({
           title: "Share link ready",
           subtitle: fileLabel ? ("Uploaded: " + fileLabel) : "",
-          url: shareUrl,
-          openUrl: window.location.origin + "/gallery/" + resp.hash,
-          streamUrl: window.location.origin + "/stream/" + resp.hash,
+          urlLabel: "Stream Gallery (best for big videos):",
+          url: streamUrl,
+          openUrl: streamUrl,
           note: "Recipients can view without logging in.",
           autoCopy: true,
         });
