@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Safe Rebuild Droppr (SRDROPPR)
-# - Stops the Droppr stack, rebuilds images, and restarts the stack
+# Safe Rebuild Dropbox (SRDROPBOX)
+# - Stops the Dropbox stack, rebuilds images, and restarts the stack
 # - Optionally starts the Cloudflare tunnel profile if requested (or if currently running)
 #
 # Usage: srdroppr [--clean] [--tunnel|--no-tunnel] [--dry-run] [-h|--help]
@@ -20,7 +20,7 @@ fi
 
 usage() {
   cat <<EOF
-Safe Rebuild Droppr (${DISPLAY_CMD})
+Safe Rebuild Dropbox (${DISPLAY_CMD})
 
 Usage:
   ${DISPLAY_CMD} [--clean] [--tunnel|--no-tunnel] [--dry-run] [-h|--help]
@@ -64,7 +64,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "[SRDROPPR] Error: Unknown argument: $1" >&2
+      echo "[SRDROPBOX] Error: Unknown argument: $1" >&2
       usage >&2
       exit 2
       ;;
@@ -82,17 +82,17 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 cd "$SCRIPT_DIR"
 
 COMPOSE_FILE="docker-compose.yml"
-NGINX_CONTAINER="droppr"
-TUNNEL_CONTAINER="cloudflared-droppr"
+NGINX_CONTAINER="dropbox"
+TUNNEL_CONTAINER="cloudflared-dropbox"
 BUILD_FLAGS=()
 
 if $CLEAN; then
-  echo "[SRDROPPR] Clean mode enabled: Disabling build cache."
+  echo "[SRDROPBOX] Clean mode enabled: Disabling build cache."
   BUILD_FLAGS+=(--no-cache)
 fi
 
 if [ ! -f "$COMPOSE_FILE" ]; then
-  echo "[SRDROPPR] Error: $COMPOSE_FILE not found in $SCRIPT_DIR" >&2
+  echo "[SRDROPBOX] Error: $COMPOSE_FILE not found in $SCRIPT_DIR" >&2
   exit 1
 fi
 
@@ -106,7 +106,7 @@ case "$TUNNEL_MODE" in
   on) USE_TUNNEL=true ;;
   off) USE_TUNNEL=false ;;
   auto) USE_TUNNEL=$AUTO_TUNNEL_RUNNING ;;
-  *) echo "[SRDROPPR] Error: Internal invalid TUNNEL_MODE=$TUNNEL_MODE" >&2; exit 3 ;;
+  *) echo "[SRDROPBOX] Error: Internal invalid TUNNEL_MODE=$TUNNEL_MODE" >&2; exit 3 ;;
 esac
 
 PROFILE_ARGS=()
@@ -115,7 +115,7 @@ if $USE_TUNNEL; then
 fi
 
 if $DRY_RUN; then
-  echo "[SRDROPPR] DRY RUN: Would run the following steps in $SCRIPT_DIR:"
+  echo "[SRDROPBOX] DRY RUN: Would run the following steps in $SCRIPT_DIR:"
   echo "  - docker compose -f $COMPOSE_FILE ${PROFILE_ARGS[*]:-(no profile)} config"
   echo "  - docker compose -f $COMPOSE_FILE ${PROFILE_ARGS[*]:-(no profile)} build ${BUILD_FLAGS[*]:-(no extra flags)}"
   echo "  - docker compose -f $COMPOSE_FILE ${PROFILE_ARGS[*]:-(no profile)} pull $NGINX_CONTAINER"
@@ -130,62 +130,62 @@ if $DRY_RUN; then
   exit 0
 fi
 
-echo "[SRDROPPR] Validating compose file..."
+echo "[SRDROPBOX] Validating compose file..."
 docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" config >/dev/null
 
 if [[ ${#BUILD_FLAGS[@]} -gt 0 ]]; then
-  echo "[SRDROPPR] Building Droppr images (Flags: ${BUILD_FLAGS[*]})..."
+  echo "[SRDROPBOX] Building Dropbox images (Flags: ${BUILD_FLAGS[*]})..."
 else
-  echo "[SRDROPPR] Building Droppr images (Flags: None)..."
+  echo "[SRDROPBOX] Building Dropbox images (Flags: None)..."
 fi
 docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" build "${BUILD_FLAGS[@]}"
 
-echo "[SRDROPPR] Pulling upstream images (best-effort)..."
+echo "[SRDROPBOX] Pulling upstream images (best-effort)..."
 docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" pull "$NGINX_CONTAINER" || true
 if $USE_TUNNEL; then
   docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" pull "$TUNNEL_CONTAINER" || true
   docker pull cloudflare/cloudflared:latest >/dev/null 2>&1 || true
 fi
 
-echo "[SRDROPPR] Bringing down Droppr stack (remove orphans)..."
+echo "[SRDROPBOX] Bringing down Dropbox stack (remove orphans)..."
 docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" down --remove-orphans || true
 
 if $USE_TUNNEL; then
-  echo "[SRDROPPR] Starting Droppr stack (tunnel profile enabled)..."
+  echo "[SRDROPBOX] Starting Dropbox stack (tunnel profile enabled)..."
 else
-  echo "[SRDROPPR] Starting Droppr stack..."
+  echo "[SRDROPBOX] Starting Dropbox stack..."
 fi
 docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" up -d
 
-echo "[SRDROPPR] Waiting for Nginx container ($NGINX_CONTAINER) to be Up..."
+echo "[SRDROPBOX] Waiting for Nginx container ($NGINX_CONTAINER) to be Up..."
 for i in {1..60}; do
   if docker ps --format '{{.Names}} {{.Status}}' | grep -q "^$NGINX_CONTAINER .*Up"; then
-    echo "[SRDROPPR] Nginx container is Up."
+    echo "[SRDROPBOX] Nginx container is Up."
     break
   fi
   sleep 1
   if [ "$i" -eq 60 ]; then
-    echo "[SRDROPPR] Warning: Nginx container did not report Up within 60s" >&2
+    echo "[SRDROPBOX] Warning: Nginx container did not report Up within 60s" >&2
   fi
 done
 
 if command -v curl >/dev/null 2>&1; then
   HOST_PORT="$(docker port "$NGINX_CONTAINER" 80/tcp 2>/dev/null | awk -F: 'NR==1{print $NF}' | tr -d '\r' || true)"
   HOST_PORT="${HOST_PORT:-8098}"
-  echo "[SRDROPPR] Checking HTTP (http://localhost:${HOST_PORT}/)..."
+  echo "[SRDROPBOX] Checking HTTP (http://localhost:${HOST_PORT}/)..."
   for i in {1..30}; do
     if curl -fsS "http://localhost:${HOST_PORT}/" >/dev/null; then
-      echo "[SRDROPPR] HTTP check OK."
+      echo "[SRDROPBOX] HTTP check OK."
       break
     fi
     sleep 1
     if [ "$i" -eq 30 ]; then
-      echo "[SRDROPPR] Warning: HTTP check failed at http://localhost:${HOST_PORT}/" >&2
+      echo "[SRDROPBOX] Warning: HTTP check failed at http://localhost:${HOST_PORT}/" >&2
     fi
   done
 fi
 
-echo "[SRDROPPR] Current Droppr containers:"
+echo "[SRDROPBOX] Current Dropbox containers:"
 docker compose -f "$COMPOSE_FILE" "${PROFILE_ARGS[@]}" ps
 
-echo "[SRDROPPR] Safe rebuild (droppr) completed."
+echo "[SRDROPBOX] Safe rebuild (dropbox) completed."

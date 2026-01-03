@@ -2,16 +2,16 @@
 
 set -euo pipefail
 
-DROPPR_DIR="/home/mlweb/mri-cooling-droppr"
-CLOUDFLARE_DIR="${DROPPR_DIR}/cloudflare"
+DROPBOX_DIR="/home/mlweb/dropbox.lucheestiy.com"
+CLOUDFLARE_DIR="${DROPBOX_DIR}/cloudflare"
 CREDS_DIR="${CLOUDFLARE_DIR}/creds"
 
-echo "=== Cloudflare Tunnel Setup for Droppr (droppr.coolmri.com) ==="
+echo "=== Cloudflare Tunnel Setup for Dropbox (dropbox.lucheestiy.com) ==="
 echo ""
-echo "This will create an independent Cloudflare tunnel for Droppr."
+echo "This will create an independent Cloudflare tunnel for Dropbox."
 echo ""
 echo "Prerequisites:"
-echo "1. Cloudflare account with coolmri.com domain"
+echo "1. Cloudflare account with lucheestiy.com domain"
 echo "2. cloudflared CLI installed and available in PATH"
 echo ""
 echo "Press Enter to continue..."
@@ -28,7 +28,7 @@ if ! cloudflared tunnel list >/dev/null 2>&1; then
   cloudflared tunnel login
 fi
 
-TUNNEL_NAME="coolmri-droppr-tunnel"
+TUNNEL_NAME="lucheestiy-dropbox-tunnel"
 
 if cloudflared tunnel list | awk '{print $2}' | grep -qx "${TUNNEL_NAME}"; then
   echo "Tunnel '${TUNNEL_NAME}' already exists; reusing it."
@@ -38,7 +38,7 @@ else
 fi
 
 TUNNEL_ID="$(cloudflared tunnel list | awk -v name="${TUNNEL_NAME}" '$2==name {print $1}' | head -n 1)"
-echo "Droppr Tunnel ID: ${TUNNEL_ID}"
+echo "Dropbox Tunnel ID: ${TUNNEL_ID}"
 
 if [ -z "${TUNNEL_ID}" ]; then
   echo "ERROR: Failed to determine tunnel ID for '${TUNNEL_NAME}'."
@@ -54,8 +54,8 @@ credentials-file: /etc/cloudflared/creds/credentials.json
 protocol: http2
 
 ingress:
-  - hostname: droppr.coolmri.com
-    service: http://droppr:80
+  - hostname: dropbox.lucheestiy.com
+    service: http://dropbox:80
     originRequest:
       noTLSVerify: true
 
@@ -63,19 +63,19 @@ ingress:
 EOF
 
 echo ""
-echo "✅ Droppr tunnel created successfully!"
+echo "✅ Dropbox tunnel created successfully!"
 echo ""
 echo "🌐 DNS Configuration Required (Cloudflare DNS):"
 echo "Type: CNAME"
-echo "Name: droppr"
+echo "Name: dropbox"
 echo "Content: ${TUNNEL_ID}.cfargotunnel.com"
 echo "Proxy: ✅ Proxied"
 echo ""
 echo "📋 Next Steps:"
 echo "1. Add the DNS record above in Cloudflare Dashboard"
-echo "2. Start Droppr (including tunnel):"
-echo "   cd ${DROPPR_DIR} && docker compose --profile tunnel up -d"
-echo "3. Test: https://droppr.coolmri.com"
+echo "2. Start Dropbox (including tunnel):"
+echo "   cd ${DROPBOX_DIR} && docker compose --profile tunnel up -d"
+echo "3. Test: https://dropbox.lucheestiy.com"
 echo ""
 echo "Tunnel configuration saved to:"
 echo "  - Config: ${CLOUDFLARE_DIR}/config.yml"

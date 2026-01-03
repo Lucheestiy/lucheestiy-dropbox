@@ -1,4 +1,4 @@
-# Cloudflare Tunnel Configuration - DROPPR ONLY
+# Cloudflare Tunnel Configuration - DROPBOX ONLY
 #
 # Run ./setup-cloudflare-tunnel.sh to create a dedicated tunnel and write the
 # correct tunnel ID + credentials file.
@@ -8,8 +8,8 @@ credentials-file: /etc/cloudflared/creds/credentials.json
 protocol: http2
 
 ingress:
-  - hostname: droppr.coolmri.com
-    service: http://droppr:80
+  - hostname: dropbox.lucheestiy.com
+    service: http://dropbox:80
     originRequest:
       noTLSVerify: true
 

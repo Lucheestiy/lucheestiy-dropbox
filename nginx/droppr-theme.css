@@ -1,4 +1,4 @@
-/* Droppr Dark Theme (Matches Gallery) - Default */
+/* Dropbox Dark Theme (Matches Gallery) - Default */
 :root {
     --bg-color: #0f172a !important;
     --card-bg: #1e293b !important;
@@ -881,7 +881,7 @@ body.light-theme input {
     color: #334155 !important;
 }
 
-/* Droppr video details text - make it readable */
+/* Dropbox video details text - make it readable */
 [data-theme="light"] .droppr-video-row-details,
 .light-theme .droppr-video-row-details,
 [data-theme="light"] .droppr-video-details-row,

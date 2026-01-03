@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-Droppr media server
+Dropbox media server
 
 Provides:
 - Gallery support:
   - GET /api/share/<hash>/files: list files in a share (public, cached)
   - GET /api/share/<hash>/file/<path>: counted downloads (redirects to FileBrowser)
   - GET /api/share/<hash>/download: counted "download all" (streams FileBrowser ZIP/file)
+- File requests:
+  - POST /api/droppr/requests: create upload-only request (auth required)
+  - GET /api/droppr/requests/<hash>: request metadata (public)
+  - POST /api/droppr/requests/<hash>/upload: upload file (public, optional password)
+- Admin user management (requires FileBrowser auth token):
+  - GET /api/droppr/users: account scope config
+  - POST /api/droppr/users: create scoped upload user
 - Admin analytics (requires FileBrowser auth token):
   - GET /api/analytics/config
   - GET /api/analytics/shares
@@ -27,17 +34,19 @@ import time
 import subprocess
 import shutil
 import hashlib
+import secrets
 from datetime import datetime, timezone
 from contextlib import contextmanager
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import requests
 from flask import Flask, Response, jsonify, redirect, request, stream_with_context
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 
 # FileBrowser API base URL (internal docker network)
-FILEBROWSER_BASE_URL = os.environ.get("DROPPR_FILEBROWSER_BASE_URL", "http://droppr-app:80")
+FILEBROWSER_BASE_URL = os.environ.get("DROPPR_FILEBROWSER_BASE_URL", "http://dropbox-app:80")
 FILEBROWSER_PUBLIC_DL_API = f"{FILEBROWSER_BASE_URL}/api/public/dl"
 FILEBROWSER_PUBLIC_SHARE_API = f"{FILEBROWSER_BASE_URL}/api/public/share"
 FILEBROWSER_SHARES_API = f"{FILEBROWSER_BASE_URL}/api/shares"
@@ -49,10 +58,32 @@ MAX_SHARE_HASH_LENGTH = 64  # Prevent DOS via extremely long hashes
 DEFAULT_CACHE_TTL_SECONDS = int(os.environ.get("DROPPR_SHARE_CACHE_TTL_SECONDS", "3600"))
 MAX_CACHE_SIZE = 1000  # Max number of shares to cache
 _share_cache_lock = threading.Lock()
-_share_files_cache: dict[str, tuple[float, str, list[dict]]] = {}
+_share_files_cache: dict[str, tuple[float, str, bool, list[dict]]] = {}
 
 IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif"}
-VIDEO_EXTS = {"mp4", "mov", "m4v", "webm", "mkv", "avi"}
+VIDEO_EXTS = {
+    "3g2",
+    "3gp",
+    "asf",
+    "avi",
+    "flv",
+    "m2ts",
+    "m2v",
+    "m4v",
+    "mkv",
+    "mov",
+    "mp4",
+    "mpe",
+    "mpeg",
+    "mpg",
+    "mts",
+    "mxf",
+    "ogv",
+    "ts",
+    "vob",
+    "webm",
+    "wmv",
+}
 
 
 def is_valid_share_hash(share_hash: str) -> bool:
@@ -82,6 +113,27 @@ def _safe_rel_path(value: str) -> str | None:
     if not parts:
         return None
     if any(p == ".." for p in parts):
+        return None
+    return "/".join(parts)
+
+
+def _normalize_upload_rel_path(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = str(value).strip().replace("\\", "/")
+    if not value:
+        return None
+    if value.startswith("/"):
+        return None
+
+    parts = []
+    for part in value.split("/"):
+        if not part or part == ".":
+            continue
+        if part == "..":
+            return None
+        parts.append(part)
+    if not parts:
         return None
     return "/".join(parts)
 
@@ -131,6 +183,86 @@ def _encode_share_path(value: str) -> str | None:
     return "/" + "/".join(quote(p, safe="") for p in parts)
 
 
+USERNAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{2,31}$")
+USER_SCOPE_ROOT = _safe_root_path(os.environ.get("DROPPR_USER_ROOT", "/users")) or "/users"
+USER_DATA_DIR = os.environ.get("DROPPR_USER_DATA_DIR", "/srv")
+try:
+    USER_PASSWORD_MIN_LEN = int(os.environ.get("DROPPR_USER_PASSWORD_MIN_LEN", "8"))
+except (TypeError, ValueError):
+    USER_PASSWORD_MIN_LEN = 8
+USER_PASSWORD_MIN_LEN = max(6, USER_PASSWORD_MIN_LEN)
+USER_DEFAULT_PERMS = {
+    "admin": False,
+    "create": True,
+    "delete": True,
+    "download": True,
+    "modify": True,
+    "rename": True,
+    "share": True,
+    "execute": True,
+}
+
+
+def _normalize_username(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = str(value).strip()
+    if not value:
+        return None
+    if not USERNAME_RE.fullmatch(value):
+        return None
+    return value
+
+
+def _normalize_password(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = str(value)
+    if len(value) < USER_PASSWORD_MIN_LEN:
+        return None
+    return value
+
+
+def _normalize_request_password(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = str(value)
+    if not value:
+        return None
+    if REQUEST_PASSWORD_MAX_LEN and len(value) > REQUEST_PASSWORD_MAX_LEN:
+        return None
+    return value
+
+
+def _build_user_scope(username: str) -> str:
+    root = USER_SCOPE_ROOT or "/users"
+    if root == "/":
+        return "/" + username
+    return root.rstrip("/") + "/" + username
+
+
+def _safe_join(base: str, *parts: str) -> str | None:
+    base_abs = os.path.abspath(base)
+    target = os.path.abspath(os.path.join(base_abs, *parts))
+    if target == base_abs or target.startswith(base_abs + os.sep):
+        return target
+    return None
+
+
+def _ensure_user_directory(scope_path: str) -> str:
+    base_dir = USER_DATA_DIR or "/srv"
+    base_abs = os.path.abspath(base_dir)
+    os.makedirs(base_abs, exist_ok=True)
+    rel = scope_path.lstrip("/")
+    target = _safe_join(base_abs, rel)
+    if not target:
+        raise RuntimeError("Invalid user directory")
+    os.makedirs(target, exist_ok=True)
+    if not os.path.isdir(target):
+        raise RuntimeError("User directory is not a directory")
+    return target
+
+
 def _normalize_ip(value: str | None) -> str | None:
     if not value:
         return None
@@ -160,6 +292,10 @@ ANALYTICS_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ANALYTICS_DB_TIMEOUT
 ALIASES_DB_PATH = os.environ.get("DROPPR_ALIASES_DB_PATH", "/database/droppr-aliases.sqlite3")
 ALIASES_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ALIASES_DB_TIMEOUT_SECONDS", "30"))
 
+REQUESTS_DB_PATH = os.environ.get("DROPPR_REQUESTS_DB_PATH", "/database/droppr-requests.sqlite3")
+REQUESTS_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_REQUESTS_DB_TIMEOUT_SECONDS", "30"))
+REQUEST_PASSWORD_MAX_LEN = int(os.environ.get("DROPPR_REQUEST_PASSWORD_MAX_LEN", "256"))
+
 VIDEO_META_DB_PATH = os.environ.get("DROPPR_VIDEO_META_DB_PATH", "/database/droppr-video-meta.sqlite3")
 VIDEO_META_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_VIDEO_META_DB_TIMEOUT_SECONDS", "10"))
 VIDEO_META_LOCK_DIR = os.environ.get("DROPPR_VIDEO_META_LOCK_DIR", "/database/video-meta-locks")
@@ -172,6 +308,7 @@ os.makedirs(VIDEO_META_LOCK_DIR, exist_ok=True)
 _last_retention_sweep_at: float = 0.0
 _analytics_db_ready: bool = False
 _aliases_db_ready: bool = False
+_requests_db_ready: bool = False
 _video_meta_db_ready: bool = False
 
 
@@ -400,6 +537,98 @@ def _ensure_aliases_db() -> None:
                 return
             except Exception as e:
                 app.logger.warning("Aliases init failed: %s", e)
+                return
+    finally:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+        finally:
+            lock_file.close()
+
+
+@contextmanager
+def _requests_conn():
+    _ensure_requests_db()
+
+    conn = sqlite3.connect(
+        REQUESTS_DB_PATH,
+        timeout=REQUESTS_DB_TIMEOUT_SECONDS,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA temp_store=MEMORY;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def _init_requests_db() -> None:
+    db_dir = os.path.dirname(REQUESTS_DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    conn = sqlite3.connect(
+        REQUESTS_DB_PATH,
+        timeout=REQUESTS_DB_TIMEOUT_SECONDS,
+        isolation_level=None,
+        check_same_thread=False,
+    )
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA busy_timeout=5000;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS file_requests (
+                hash TEXT PRIMARY KEY,
+                path TEXT NOT NULL,
+                password_hash TEXT,
+                created_at INTEGER NOT NULL,
+                expires_at INTEGER
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_file_requests_expires_at ON file_requests(expires_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_file_requests_created_at ON file_requests(created_at)")
+    finally:
+        conn.close()
+
+
+def _ensure_requests_db() -> None:
+    global _requests_db_ready
+
+    if _requests_db_ready:
+        return
+
+    db_dir = os.path.dirname(REQUESTS_DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+
+    lock_path = f"{REQUESTS_DB_PATH}.init.lock"
+    lock_file = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+
+        for attempt in range(10):
+            try:
+                _init_requests_db()
+                _requests_db_ready = True
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < 9:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                app.logger.warning("Requests init failed: %s", e)
+                return
+            except Exception as e:
+                app.logger.warning("Requests init failed: %s", e)
                 return
     finally:
         try:
@@ -1052,6 +1281,32 @@ def _create_filebrowser_share(*, token: str, path_encoded: str, hours: int) -> d
     return data if isinstance(data, dict) else {}
 
 
+def _create_filebrowser_user(*, token: str, username: str, password: str, scope: str) -> dict:
+    payload = {"what": "user", "data": {"username": username, "password": password, "scope": scope, "perm": USER_DEFAULT_PERMS}}
+    resp = requests.post(
+        f"{FILEBROWSER_BASE_URL}/api/users",
+        headers={"X-Auth": token, "Content-Type": "application/json"},
+        json=payload,
+        timeout=10,
+    )
+    if resp.status_code in {401, 403}:
+        raise PermissionError("Unauthorized")
+    if resp.status_code == 409:
+        raise FileExistsError("User already exists")
+    if resp.status_code >= 400:
+        try:
+            data = resp.json()
+            msg = data.get("error") or data.get("message")
+        except Exception:
+            msg = None
+        raise RuntimeError(msg or f"User API failed ({resp.status_code})")
+    try:
+        data = resp.json()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def _fetch_filebrowser_shares(token: str) -> list[dict]:
     # TEMPORARY FIX: Disable fetching shares to prevent FileBrowser panic (slice bounds out of range)
     # The endpoint GET /api/shares seems to crash the current FileBrowser instance.
@@ -1128,6 +1383,76 @@ def _fetch_filebrowser_resource(path: str, token: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def _request_is_expired(row: sqlite3.Row | dict) -> bool:
+    expires_at = row.get("expires_at") if isinstance(row, dict) else row["expires_at"]
+    if not expires_at:
+        return False
+    try:
+        expires_at = int(expires_at)
+    except (TypeError, ValueError):
+        return False
+    return expires_at > 0 and int(time.time()) > expires_at
+
+
+def _resolve_request_dir(path: str) -> str | None:
+    safe_path = _safe_root_path(path)
+    if not safe_path:
+        return None
+    base_dir = USER_DATA_DIR or "/srv"
+    target = _safe_join(base_dir, safe_path.lstrip("/"))
+    return target
+
+
+def _create_file_request_record(*, path: str, password_hash: str | None, expires_at: int | None) -> dict:
+    created_at = int(time.time())
+    for _ in range(20):
+        share_hash = secrets.token_urlsafe(6).rstrip("=")
+        if not is_valid_share_hash(share_hash):
+            continue
+        try:
+            with _requests_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO file_requests (hash, path, password_hash, created_at, expires_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (share_hash, path, password_hash, created_at, expires_at),
+                )
+            return {
+                "hash": share_hash,
+                "path": path,
+                "password_hash": password_hash,
+                "created_at": created_at,
+                "expires_at": expires_at,
+            }
+        except sqlite3.IntegrityError:
+            continue
+        except Exception as e:
+            app.logger.warning("Request creation failed: %s", e)
+            raise
+    raise RuntimeError("Failed to generate request link")
+
+
+def _fetch_file_request(share_hash: str) -> dict | None:
+    with _requests_conn() as conn:
+        row = conn.execute(
+            "SELECT hash, path, password_hash, created_at, expires_at FROM file_requests WHERE hash = ?",
+            (share_hash,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def _ensure_unique_path(path: str) -> str:
+    if not os.path.exists(path):
+        return path
+    base, ext = os.path.splitext(path)
+    for idx in range(1, 1000):
+        candidate = f"{base} ({idx}){ext}"
+        if not os.path.exists(candidate):
+            return candidate
+    raise RuntimeError("Too many duplicate filenames")
+
+
 def _infer_gallery_type(item: dict, extension: str) -> str:
     raw_type = (item.get("type") or "").strip().lower()
     if raw_type in {"image", "video"}:
@@ -1139,7 +1464,9 @@ def _infer_gallery_type(item: dict, extension: str) -> str:
     return "file"
 
 
-def _build_folder_share_file_list(*, request_hash: str, source_hash: str, root: dict) -> list[dict]:
+def _build_folder_share_file_list(
+    *, request_hash: str, source_hash: str, root: dict, recursive: bool
+) -> list[dict]:
     files: list[dict] = []
     dirs_to_scan: list[str] = []
     visited_dirs: set[str] = set()
@@ -1153,33 +1480,34 @@ def _build_folder_share_file_list(*, request_hash: str, source_hash: str, root: 
             continue
         if item.get("isDir"):
             path = item.get("path")
-            if isinstance(path, str) and path.startswith("/"):
+            if recursive and isinstance(path, str) and path.startswith("/"):
                 dirs_to_scan.append(path)
             continue
         files.append(item)
 
-    while dirs_to_scan:
-        dir_path = dirs_to_scan.pop()
-        if dir_path in visited_dirs:
-            continue
-        visited_dirs.add(dir_path)
-
-        data = _fetch_public_share_json(source_hash, subpath=dir_path)
-        if not data:
-            continue
-        items = data.get("items")
-        if not isinstance(items, list):
-            continue
-
-        for item in items:
-            if not isinstance(item, dict):
+    if recursive:
+        while dirs_to_scan:
+            dir_path = dirs_to_scan.pop()
+            if dir_path in visited_dirs:
                 continue
-            if item.get("isDir"):
-                path = item.get("path")
-                if isinstance(path, str) and path.startswith("/"):
-                    dirs_to_scan.append(path)
+            visited_dirs.add(dir_path)
+
+            data = _fetch_public_share_json(source_hash, subpath=dir_path)
+            if not data:
                 continue
-            files.append(item)
+            items = data.get("items")
+            if not isinstance(items, list):
+                continue
+
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("isDir"):
+                    path = item.get("path")
+                    if isinstance(path, str) and path.startswith("/"):
+                        dirs_to_scan.append(path)
+                    continue
+                files.append(item)
 
     # Normalize, remove directories, and enrich with URLs
     result = []
@@ -1241,21 +1569,33 @@ def _build_file_share_file_list(*, request_hash: str, source_hash: str, meta: di
 
 
 def _get_share_files(
-    request_hash: str, *, source_hash: str, force_refresh: bool, max_age_seconds: int
+    request_hash: str,
+    *,
+    source_hash: str,
+    force_refresh: bool,
+    max_age_seconds: int,
+    recursive: bool,
 ) -> list[dict] | None:
     now = time.time()
     if not force_refresh:
         with _share_cache_lock:
             cached = _share_files_cache.get(request_hash)
-            if cached and (now - cached[0]) < max_age_seconds and cached[1] == source_hash:
-                return cached[2]
+            if (
+                cached
+                and (now - cached[0]) < max_age_seconds
+                and cached[1] == source_hash
+                and cached[2] == recursive
+            ):
+                return cached[3]
 
     data = _fetch_public_share_json(source_hash)
     if not data:
         return None
 
     if isinstance(data.get("items"), list):
-        files = _build_folder_share_file_list(request_hash=request_hash, source_hash=source_hash, root=data)
+        files = _build_folder_share_file_list(
+            request_hash=request_hash, source_hash=source_hash, root=data, recursive=recursive
+        )
     else:
         files = _build_file_share_file_list(request_hash=request_hash, source_hash=source_hash, meta=data)
 
@@ -1264,7 +1604,7 @@ def _get_share_files(
             # Simple eviction strategy: clear the whole cache if it gets too big.
             # A more sophisticated LRU is possible but likely overkill for this scale.
             _share_files_cache.clear()
-        _share_files_cache[request_hash] = (now, source_hash, files)
+        _share_files_cache[request_hash] = (now, source_hash, recursive, files)
 
     return files
 
@@ -1285,11 +1625,15 @@ def list_share_files(share_hash: str):
         except (TypeError, ValueError):
             max_age_seconds = DEFAULT_CACHE_TTL_SECONDS
 
+    recursive_param = request.args.get("recursive")
+    recursive = True if recursive_param is None else parse_bool(recursive_param)
+
     files = _get_share_files(
         share_hash,
         source_hash=source_hash,
         force_refresh=force_refresh,
         max_age_seconds=max_age_seconds,
+        recursive=recursive,
     )
     if files is None:
         return jsonify({"error": "Share not found"}), 404
@@ -2085,6 +2429,264 @@ def download_all(share_hash: str):
     except Exception as e:
         app.logger.error("Failed to download share for %s: %s", share_hash, e)
         return "Failed to download share", 500
+
+
+@app.route("/api/droppr/requests", methods=["POST"])
+def droppr_create_request():
+    token = _get_auth_token()
+    if not token:
+        return jsonify({"error": "Missing auth token"}), 401
+
+    try:
+        status = _validate_filebrowser_admin(token)
+    except Exception as e:
+        return jsonify({"error": f"Failed to validate auth: {e}"}), 502
+
+    if status is not None:
+        return jsonify({"error": "Unauthorized"}), status
+
+    payload = request.get_json(silent=True) or {}
+    raw_path = payload.get("path") or payload.get("folder") or payload.get("dir")
+    safe_path = _safe_root_path(raw_path)
+    if not safe_path:
+        return jsonify({"error": "Invalid folder path"}), 400
+
+    try:
+        meta = _fetch_filebrowser_resource(safe_path, token)
+    except PermissionError:
+        return jsonify({"error": "Unauthorized"}), 401
+    except Exception as e:
+        app.logger.error("Failed to read folder metadata for %s: %s", safe_path, e)
+        return jsonify({"error": "Failed to read folder metadata"}), 502
+
+    if not meta or not parse_bool(meta.get("isDir")):
+        return jsonify({"error": "Folder not found"}), 404
+
+    hours_raw = payload.get("expires_hours") or payload.get("expiresHours") or payload.get("hours") or 0
+    try:
+        hours = int(str(hours_raw).strip() or "0")
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid expiration hours"}), 400
+
+    max_hours = 24 * 365 * 10
+    if hours < 0 or hours > max_hours:
+        return jsonify({"error": f"Hours must be between 0 and {max_hours}"}), 400
+
+    password = _normalize_request_password(payload.get("password"))
+    if payload.get("password") and not password:
+        return jsonify({"error": "Invalid password"}), 400
+
+    password_hash = generate_password_hash(password) if password else None
+    expires_at = int(time.time()) + (hours * 3600) if hours > 0 else None
+
+    try:
+        record = _create_file_request_record(path=safe_path, password_hash=password_hash, expires_at=expires_at)
+    except Exception as e:
+        app.logger.error("Failed to create request for %s: %s", safe_path, e)
+        return jsonify({"error": "Failed to create request link"}), 500
+
+    folder_name = os.path.basename(safe_path.rstrip("/")) or "Uploads"
+    resp = jsonify(
+        {
+            "hash": record["hash"],
+            "url": f"/request/{record['hash']}",
+            "folder": folder_name,
+            "expires_at": record["expires_at"],
+            "requires_password": bool(password_hash),
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/droppr/requests/<share_hash>", methods=["GET"])
+def droppr_request_info(share_hash: str):
+    if not is_valid_share_hash(share_hash):
+        return jsonify({"error": "Invalid request hash"}), 400
+
+    try:
+        row = _fetch_file_request(share_hash)
+    except Exception as e:
+        app.logger.error("Failed to load request %s: %s", share_hash, e)
+        return jsonify({"error": "Failed to load request"}), 500
+
+    if not row:
+        return jsonify({"error": "Request not found"}), 404
+
+    if _request_is_expired(row):
+        return jsonify({"error": "Request expired"}), 410
+
+    expires_at = row.get("expires_at")
+    expires_in = None
+    if expires_at:
+        try:
+            expires_in = max(0, int(expires_at) - int(time.time()))
+        except (TypeError, ValueError):
+            expires_in = None
+
+    folder_name = os.path.basename(str(row.get("path") or "").rstrip("/")) or "Uploads"
+    resp = jsonify(
+        {
+            "hash": share_hash,
+            "folder": folder_name,
+            "expires_at": expires_at,
+            "expires_in": expires_in,
+            "requires_password": bool(row.get("password_hash")),
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/droppr/requests/<share_hash>/upload", methods=["POST"])
+def droppr_request_upload(share_hash: str):
+    if not is_valid_share_hash(share_hash):
+        return jsonify({"error": "Invalid request hash"}), 400
+
+    try:
+        row = _fetch_file_request(share_hash)
+    except Exception as e:
+        app.logger.error("Failed to load request %s: %s", share_hash, e)
+        return jsonify({"error": "Failed to load request"}), 500
+
+    if not row:
+        return jsonify({"error": "Request not found"}), 404
+
+    if _request_is_expired(row):
+        return jsonify({"error": "Request expired"}), 410
+
+    stored_hash = row.get("password_hash")
+    if stored_hash:
+        raw_password = request.headers.get("X-Request-Password") or request.form.get("password") or ""
+        raw_password = unquote(raw_password) if raw_password else ""
+        if not raw_password or not check_password_hash(str(stored_hash), raw_password):
+            return jsonify({"error": "Invalid password"}), 401
+
+    file_storage = request.files.get("file")
+    if not file_storage or not file_storage.filename:
+        return jsonify({"error": "Missing file"}), 400
+
+    file_name = str(file_storage.filename or "").replace("\\", "/").split("/")[-1].strip()
+    if not file_name:
+        return jsonify({"error": "Invalid file name"}), 400
+
+    rel_path = (
+        request.form.get("relative_path")
+        or request.form.get("relativePath")
+        or request.form.get("relpath")
+        or request.form.get("path")
+        or ""
+    )
+    rel_path = _normalize_upload_rel_path(rel_path) if rel_path else None
+    if not rel_path:
+        rel_path = _normalize_upload_rel_path(file_name)
+    if not rel_path:
+        return jsonify({"error": "Invalid file path"}), 400
+
+    base_dir = _resolve_request_dir(str(row.get("path") or ""))
+    if not base_dir:
+        return jsonify({"error": "Invalid request folder"}), 400
+
+    target = _safe_join(base_dir, rel_path)
+    if not target:
+        return jsonify({"error": "Invalid file path"}), 400
+
+    target_dir = os.path.dirname(target)
+    try:
+        os.makedirs(target_dir, exist_ok=True)
+    except Exception as e:
+        app.logger.error("Failed to create directory %s: %s", target_dir, e)
+        return jsonify({"error": "Failed to prepare upload folder"}), 500
+
+    tmp_path = None
+    try:
+        target = _ensure_unique_path(target)
+        tmp_path = target + ".uploading"
+        with open(tmp_path, "wb") as handle:
+            shutil.copyfileobj(file_storage.stream, handle)
+        os.replace(tmp_path, target)
+    except Exception as e:
+        app.logger.error("Failed to store upload %s: %s", target, e)
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+        return jsonify({"error": "Failed to store upload"}), 500
+
+    rel_stored = os.path.relpath(target, base_dir).replace(os.sep, "/")
+    resp = jsonify(
+        {
+            "name": os.path.basename(target),
+            "path": rel_stored,
+            "size": os.path.getsize(target) if os.path.exists(target) else None,
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/droppr/users", methods=["GET", "POST"])
+def droppr_users():
+    token = _get_auth_token()
+    if not token:
+        return jsonify({"error": "Missing auth token"}), 401
+
+    try:
+        status = _validate_filebrowser_admin(token)
+    except Exception as e:
+        return jsonify({"error": f"Failed to validate auth: {e}"}), 502
+
+    if status is not None:
+        return jsonify({"error": "Unauthorized"}), status
+
+    if request.method == "GET":
+        resp = jsonify(
+            {
+                "root": USER_SCOPE_ROOT,
+                "username_pattern": USERNAME_RE.pattern,
+                "password_min_length": USER_PASSWORD_MIN_LEN,
+            }
+        )
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    payload = request.get_json(silent=True) or {}
+    username = _normalize_username(payload.get("username") or payload.get("user") or payload.get("name"))
+    if not username:
+        return jsonify({"error": "Invalid username"}), 400
+
+    password = _normalize_password(payload.get("password"))
+    if not password:
+        return jsonify({"error": f"Password must be at least {USER_PASSWORD_MIN_LEN} characters"}), 400
+
+    scope = _build_user_scope(username)
+    try:
+        _ensure_user_directory(scope)
+    except Exception as e:
+        app.logger.error("Failed to create user directory for %s: %s", username, e)
+        return jsonify({"error": "Failed to create user directory"}), 500
+
+    try:
+        user = _create_filebrowser_user(token=token, username=username, password=password, scope=scope)
+    except FileExistsError:
+        return jsonify({"error": "User already exists"}), 409
+    except PermissionError:
+        return jsonify({"error": "Unauthorized"}), 401
+    except Exception as e:
+        app.logger.error("Failed to create user %s: %s", username, e)
+        return jsonify({"error": "Failed to create user"}), 502
+
+    resp = jsonify(
+        {
+            "id": user.get("id") if isinstance(user, dict) else None,
+            "username": username,
+            "scope": scope,
+            "root": USER_SCOPE_ROOT,
+        }
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.route("/api/droppr/shares/<share_hash>/expire", methods=["POST"])

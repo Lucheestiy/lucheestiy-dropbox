@@ -2,8 +2,8 @@ services:
   app:
     build:
       context: ./app
-    image: mri-cooling-droppr-app:custom
-    container_name: droppr-app
+    image: lucheestiy-dropbox-app:custom
+    container_name: dropbox-app
     restart: unless-stopped
     user: "1000:1000"
     volumes:
@@ -13,12 +13,12 @@ services:
     networks:
       - default
 
-  droppr:
+  dropbox:
     image: nginx:1.25-alpine
-    container_name: droppr
+    container_name: dropbox
     restart: unless-stopped
     ports:
-      - "${DROPPR_HOST_PORT:-8098}:80"
+      - "${DROPBOX_HOST_PORT:-8099}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
@@ -27,6 +27,7 @@ services:
       - ./nginx-fixed/video-player.html:/usr/share/nginx/html/video-player.html:ro
       - ./nginx/test-media.html:/usr/share/nginx/html/test-media.html:ro
       - ./nginx/stream-gallery.html:/usr/share/nginx/html/stream-gallery.html:ro
+      - ./nginx/request.html:/usr/share/nginx/html/request.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
       - ./nginx/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
       - ./database/proxy-cache:/usr/share/nginx/html/proxy-cache:ro
@@ -35,36 +36,16 @@ services:
     networks:
       - default
 
-  faststart:
-    build:
-      context: ./faststart
-    container_name: droppr-faststart
-    restart: unless-stopped
-    user: "1000:1000"
-    volumes:
-      - ./data:/srv
-      - ./database:/database
-    environment:
-      - WATCH_DIR=/srv
-      # Video re-encode settings (HEVC→H.264 and rare error-fix fallbacks).
-      # Lower CRF = higher quality (and larger files).
-      - DROPPR_FASTSTART_X264_PRESET=${DROPPR_FASTSTART_X264_PRESET:-slow}
-      - DROPPR_FASTSTART_X264_CRF=${DROPPR_FASTSTART_X264_CRF:-16}
-      - DROPPR_FASTSTART_AAC_BITRATE=${DROPPR_FASTSTART_AAC_BITRATE:-256k}
-      - DROPPR_FASTSTART_COPY_AUDIO=${DROPPR_FASTSTART_COPY_AUDIO:-true}
-      - DROPPR_FASTSTART_FFMPEG_TIMEOUT_SECONDS=${DROPPR_FASTSTART_FFMPEG_TIMEOUT_SECONDS:-7200}
-    depends_on:
-      - app
-
   media-server:
     build:
       context: ./media-server
-    container_name: droppr-media-server
+    container_name: dropbox-media-server
     restart: unless-stopped
     command: gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 10 --access-logfile - --error-logfile - app:app
     user: "1000:1000"
     volumes:
       - ./database:/database
+      - ./data:/srv
     environment:
       - DROPPR_CACHE_DIR=/database/thumb-cache
       - DROPPR_THUMB_MAX_CONCURRENCY=1
@@ -75,16 +56,16 @@ services:
     networks:
       - default
 
-  cloudflared-droppr:
+  cloudflared-dropbox:
     image: cloudflare/cloudflared:latest
-    container_name: cloudflared-droppr
+    container_name: cloudflared-dropbox
     restart: unless-stopped
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
       - ./cloudflare/config.yml:/etc/cloudflared/config.yml:ro
       - ./cloudflare/creds:/etc/cloudflared/creds:ro
     depends_on:
-      - droppr
+      - dropbox
     profiles:
       - tunnel
     networks:
@@ -92,4 +73,4 @@ services:
 
 networks:
   default:
-    name: mri-cooling-droppr_default
+    name: lucheestiy-dropbox_default

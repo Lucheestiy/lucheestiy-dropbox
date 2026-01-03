@@ -1130,7 +1130,7 @@
 
     <div class="header">
         <h1>Shared Media Gallery</h1>
-        <p>Viewing files shared via Droppr</p>
+        <p>Viewing files shared via Dropbox</p>
 
         <div class="controls-bar">
             <div class="search-box">
@@ -1382,8 +1382,9 @@
 
         function formatSize(b) {
             if (!b) return '0 B';
-            const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
+            const k = 1000, s = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(b) / Math.log(k));
+            if (i <= 0) return Math.round(b) + ' B';
             return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
         }
 
@@ -2013,6 +2014,14 @@
         async function fetchFiles(forceRefresh = false) {
             const params = new URLSearchParams();
             if (forceRefresh) params.set('refresh', '1');
+            const recursiveParam = new URLSearchParams(window.location.search).get('recursive');
+            if (recursiveParam == null) {
+                params.set('recursive', '1');
+            } else {
+                const v = String(recursiveParam).trim().toLowerCase();
+                const flag = (v === '1' || v === 'true' || v === 'yes' || v === 'on') ? '1' : '0';
+                params.set('recursive', flag);
+            }
             params.set('v', Date.now());
 
             const controller = new AbortController();
@@ -2397,7 +2406,7 @@
             if (!state.shareHash || state.shareHash === 'gallery') {
                 els.loading.style.display = 'none';
                 els.errorTitle.textContent = 'Invalid share link';
-                els.errorMessage.textContent = 'Please use a valid Droppr share link.';
+                els.errorMessage.textContent = 'Please use a valid Dropbox share link.';
                 els.error.style.display = 'block';
                 return;
             }
