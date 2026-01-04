@@ -1,0 +1,42 @@
+{{- if .Values.persistence.media.enabled }}
+{{- if not .Values.persistence.media.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "droppr.fullname" . }}-media-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "droppr.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.media.accessMode }}
+  {{- if .Values.persistence.media.storageClass }}
+  storageClassName: {{ .Values.persistence.media.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.media.size }}
+{{- end }}
+{{- end }}
+
+---
+{{- if .Values.persistence.cache.enabled }}
+{{- if not .Values.persistence.cache.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "droppr.fullname" . }}-cache-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "droppr.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.cache.accessMode }}
+  {{- if .Values.persistence.cache.storageClass }}
+  storageClassName: {{ .Values.persistence.cache.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.cache.size }}
+{{- end }}
+{{- end }}

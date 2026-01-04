@@ -459,7 +459,7 @@ interface UploadResponse {
 
       const total = entry.file!.size;
       let offset = 0;
-      
+
       // Try to resume session
       const storageKey = `droppr_upload_${requestHash}_${entry.name}_${total}`;
       let uploadId = entry.uploadId || localStorage.getItem(storageKey) || "";

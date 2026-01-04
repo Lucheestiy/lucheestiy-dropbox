@@ -8,7 +8,6 @@ import time
 from contextlib import contextmanager
 
 from ..models import COMMENTS_DB_PATH, CommentsBase, get_comments_engine
-from ..models.comments import Comment
 
 logger = logging.getLogger("droppr.comments")
 
@@ -101,4 +100,4 @@ def _delete_comment(comment_id: int, share_hash: str) -> bool:
             "DELETE FROM comments WHERE id = ? AND share_hash = ?",
             (comment_id, share_hash)
         )
-        return True # Simplified
+        return result.rowcount > 0

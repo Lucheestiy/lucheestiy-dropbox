@@ -61,22 +61,25 @@ describe("AccountsModal", () => {
     usernameInput.value = "testuser";
     passwordInput.value = "password123";
 
-    const mockResponse = {
-      ok: true,
-      json: () => Promise.resolve({ scope: "/users/testuser" }),
-    };
-    (api.dropprFetch as any).mockResolvedValue(mockResponse);
+    const mockResponse = new Response(JSON.stringify({ scope: "/users/testuser" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+    vi.mocked(api.dropprFetch).mockResolvedValue(mockResponse);
 
     createBtn.click();
-    
-    // Wait for the async submit to complete and update the DOM
-    await new Promise(resolve => setTimeout(resolve, 50));
 
-    expect(api.dropprFetch).toHaveBeenCalledWith("/api/droppr/users", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({ username: "testuser", password: "password123" }),
-    }));
-    
+    // Wait for the async submit to complete and update the DOM
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(api.dropprFetch).toHaveBeenCalledWith(
+      "/api/droppr/users",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ username: "testuser", password: "password123" }),
+      })
+    );
+
     const statusEl = document.getElementById("droppr-account-status");
     expect(statusEl?.textContent).toContain("Account created");
   });

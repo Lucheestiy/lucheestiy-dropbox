@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "droppr.fullname" . }}-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "droppr.labels" . | nindent 4 }}
+data:
+  # FileBrowser configuration
+  DROPPR_FILEBROWSER_BASE_URL: {{ .Values.config.filebrowserBaseUrl | quote }}
+
+  # Redis configuration
+  DROPPR_REDIS_URL: {{ .Values.config.redisUrl | quote }}
+
+  # Celery configuration
+  CELERY_BROKER_URL: {{ .Values.config.celeryBrokerUrl | quote }}
+  CELERY_RESULT_BACKEND: {{ .Values.config.celeryResultBackend | quote }}
+
+  # Media processing
+  DROPPR_THUMB_MAX_CONCURRENCY: {{ .Values.config.thumbMaxConcurrency | quote }}
+  DROPPR_PROXY_MAX_CONCURRENCY: {{ .Values.config.proxyMaxConcurrency | quote }}
+
+  # Upload settings
+  DROPPR_UPLOAD_ALLOWED_EXTENSIONS: {{ .Values.config.uploadAllowedExtensions | quote }}
+  DROPPR_UPLOAD_MAX_SIZE_MB: {{ .Values.config.uploadMaxSizeMb | quote }}
+
+  # User management
+  DROPPR_USER_ROOT: {{ .Values.config.userRoot | quote }}
+  DROPPR_USER_DATA_DIR: {{ .Values.config.userDataDir | quote }}
+  DROPPR_USER_PASSWORD_MIN_LEN: {{ .Values.config.userPasswordMinLen | quote }}
+
+  # Analytics
+  DROPPR_ANALYTICS_ENABLED: {{ .Values.config.analyticsEnabled | quote }}
+  DROPPR_ANALYTICS_IP_MODE: {{ .Values.config.analyticsIpMode | quote }}
+  DROPPR_ANALYTICS_RETENTION_DAYS: {{ .Values.config.analyticsRetentionDays | quote }}
+
+  # Observability
+  DROPPR_LOG_FORMAT: {{ .Values.config.logFormat | quote }}
+  DROPPR_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  DROPPR_OTEL_ENABLED: {{ .Values.config.otelEnabled | quote }}
+  DROPPR_OTEL_SERVICE_NAME: {{ .Values.config.otelServiceName | quote }}
+  DROPPR_OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.config.otelExporterOtlpEndpoint | quote }}
+
+  # Cloudflare R2
+  DROPPR_R2_ENABLED: {{ .Values.config.r2Enabled | quote }}
+
+  # Flask environment
+  FLASK_ENV: {{ .Values.mediaServer.env.FLASK_ENV | quote }}
+  PYTHONUNBUFFERED: {{ .Values.mediaServer.env.PYTHONUNBUFFERED | quote }}

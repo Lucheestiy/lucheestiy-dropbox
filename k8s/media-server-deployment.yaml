@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-server
+  namespace: droppr
+  labels:
+    app: media-server
+    component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: media-server
+  template:
+    metadata:
+      labels:
+        app: media-server
+        component: backend
+    spec:
+      containers:
+      - name: media-server
+        image: ghcr.io/your-org/droppr-media-server:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        envFrom:
+        - configMapRef:
+            name: droppr-config
+        - secretRef:
+            name: droppr-secrets
+        volumeMounts:
+        - name: media-storage
+          mountPath: /media
+        - name: database-storage
+          mountPath: /database
+        - name: cache-storage
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: droppr-media-pvc
+      - name: database-storage
+        persistentVolumeClaim:
+          claimName: droppr-database-pvc
+      - name: cache-storage
+        persistentVolumeClaim:
+          claimName: droppr-cache-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-server-service
+  namespace: droppr
+  labels:
+    app: media-server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: media-server

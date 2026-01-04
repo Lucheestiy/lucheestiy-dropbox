@@ -11,7 +11,7 @@ describe("AdminService", () => {
     vi.clearAllMocks();
     // Reset internal state
     adminService.isAdmin = null;
-    (adminService as any).checkPromise = null;
+    (adminService as unknown as { checkPromise: Promise<boolean> | null }).checkPromise = null;
   });
 
   it("should return false if not logged in", async () => {
@@ -24,7 +24,7 @@ describe("AdminService", () => {
   it("should return cached value if already checked", async () => {
     vi.mocked(auth.isLoggedIn).mockReturnValue(true);
     adminService.isAdmin = true;
-    
+
     const result = await adminService.check();
     expect(result).toBe(true);
     expect(api.dropprFetch).not.toHaveBeenCalled();

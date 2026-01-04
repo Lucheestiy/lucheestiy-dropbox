@@ -4,10 +4,10 @@ import { reportError, getRecoverySuggestion } from "../../src/utils/error";
 describe("Error Utils", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (window as any).Sentry = {
+    window.Sentry = {
       captureException: vi.fn(),
       captureMessage: vi.fn(),
-    };
+    } as unknown as SentrySDK;
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -15,23 +15,29 @@ describe("Error Utils", () => {
     it("should log to console and call Sentry.captureException for Error objects", () => {
       const error = new Error("Test error");
       const context = { foo: "bar" };
-      
+
       reportError(error, { context });
-      
+
       expect(console.error).toHaveBeenCalled();
-      expect((window as any).Sentry.captureException).toHaveBeenCalledWith(error, expect.objectContaining({
-        extra: context
-      }));
+      expect(window.Sentry?.captureException).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({
+          extra: context,
+        })
+      );
     });
 
     it("should call Sentry.captureMessage for string errors", () => {
       const error = "Something went wrong";
-      
+
       reportError(error);
-      
-      expect((window as any).Sentry.captureMessage).toHaveBeenCalledWith(error, expect.objectContaining({
-        level: "error"
-      }));
+
+      expect(window.Sentry?.captureMessage).toHaveBeenCalledWith(
+        error,
+        expect.objectContaining({
+          level: "error",
+        })
+      );
     });
   });
 

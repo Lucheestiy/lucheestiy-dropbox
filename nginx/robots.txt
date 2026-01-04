@@ -1,10 +1,43 @@
+# Droppr File Sharing - Robots.txt
+# Updated: 2026-01-04
+
 User-agent: *
 Disallow: /api/
 Disallow: /files/
 Disallow: /settings/
 Disallow: /users/
-Allow: /gallery/
-Allow: /stream/
-Allow: /request/
-Allow: /player
+Disallow: /analytics/
+Disallow: /metrics
+Disallow: /health
+
+# Allow public pages
+Allow: /gallery.html
+Allow: /request.html
+Allow: /video-player.html
+Allow: /stream-gallery.html
+Allow: /static/
 Allow: /
+
+# Crawl delay (be respectful)
+Crawl-delay: 10
+
+# Sitemap location
+Sitemap: https://dropbox.lucheestiy.com/sitemap.xml
+
+# Specific bot rules
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /static/
+Disallow: /files/
+
+User-agent: Bingbot
+Allow: /
+
+# Block aggressive scrapers
+User-agent: AhrefsBot
+Crawl-delay: 30
+
+User-agent: SemrushBot
+Crawl-delay: 30

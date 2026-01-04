@@ -56,9 +56,37 @@ def test_get_comments(mock_conn):
 
 
 def test_delete_comment(mock_conn):
+    mock_conn.execute.return_value.rowcount = 1
     res = comments_service._delete_comment(1, "hash1")
     assert res is True
     assert mock_conn.execute.called
     args, _ = mock_conn.execute.call_args
     assert "DELETE FROM comments" in args[0]
     assert args[1] == (1, "hash1")
+
+
+@patch("app.services.comments.CommentsBase")
+@patch("app.services.comments._COMMENTS_ENGINE")
+@patch("os.makedirs")
+def test_init_comments_db(mock_makedirs, mock_engine, mock_base, tmp_path):
+    with patch("app.services.comments.COMMENTS_DB_PATH", str(tmp_path / "db.sqlite")):
+        comments_service._init_comments_db()
+        assert mock_makedirs.called
+        assert mock_base.metadata.create_all.called
+
+
+@patch("app.services.comments._init_comments_db")
+@patch("os.makedirs")
+@patch("fcntl.flock")
+@patch("builtins.open")
+def test_ensure_comments_db(mock_open, mock_flock, mock_makedirs, mock_init):
+    # Reset state
+    comments_service._comments_db_ready = False
+    comments_service._ensure_comments_db()
+    assert mock_init.called
+    assert comments_service._comments_db_ready is True
+
+    # Call again, should not call init
+    mock_init.reset_mock()
+    comments_service._ensure_comments_db()
+    assert not mock_init.called

@@ -1,4 +1,213 @@
-const C="droppr_access_token",b="droppr_refresh_token",x="droppr_otp_code";function U(){try{const e=localStorage.getItem("jwt");return e?String(e):null}catch{return null}}function w(e){if(!e)return null;try{const s=String(e).split(".");if(s.length!==3)return null;const a=s[1].replace(/-/g,"+").replace(/_/g,"/"),n=a.length%4?"====".slice(a.length%4):"";return JSON.parse(atob(a+n))}catch{return null}}function F(){try{const e=localStorage.getItem(C),s=localStorage.getItem(b),a=w(e),n=w(s);return{access:e,refresh:s,accessExp:a!=null&&a.exp?a.exp*1e3:0,refreshExp:n!=null&&n.exp?n.exp*1e3:0}}catch{return{access:null,refresh:null,accessExp:0,refreshExp:0}}}function N(){try{return sessionStorage.getItem(x)||""}catch{return""}}function z(){const e=window.prompt("Enter your 2FA code:");if(e){try{sessionStorage.setItem(x,String(e))}catch{}return e}return""}async function k(e,s=!0){if(!e)return null;const a={Authorization:`Bearer ${e}`},n=N();n&&(a["X-Droppr-OTP"]=n);const d=await fetch("/api/droppr/auth/refresh",{method:"POST",headers:a}),c=await d.text().catch(()=>"");let r=null;if(c)try{r=JSON.parse(c)}catch{}if(d.status===401&&(r!=null&&r.otp_required)&&s)return z()?k(e,!1):null;if(!d.ok||!(r!=null&&r.access_token))return null;try{localStorage.setItem(C,r.access_token),r.refresh_token&&localStorage.setItem(b,r.refresh_token)}catch{}return r.access_token}async function M(){const e=F(),s=Date.now();return e.access&&e.accessExp>s+6e4?e.access:e.refresh&&e.refreshExp>s+6e4?await k(e.refresh,!0):null}const h=U(),t={rangeLabel:document.getElementById("rangeLabel"),rangeSelect:document.getElementById("rangeSelect"),refresh:document.getElementById("refreshBtn"),search:document.getElementById("searchInput"),includeEmpty:document.getElementById("includeEmpty"),sharesBody:document.getElementById("sharesBody"),sharesCount:document.getElementById("sharesCount"),status:document.getElementById("status"),metricDownloads:document.getElementById("metricDownloads"),metricZip:document.getElementById("metricZip"),metricFiles:document.getElementById("metricFiles"),metricViews:document.getElementById("metricViews"),modal:document.getElementById("detailModal"),modalClose:document.getElementById("detailClose"),detailTitle:document.getElementById("detailTitle"),detailSub:document.getElementById("detailSub"),detailMetrics:document.getElementById("detailMetrics"),ipsBody:document.getElementById("ipsBody"),eventsBody:document.getElementById("eventsBody"),exportCsv:document.getElementById("exportCsvBtn"),openGallery:document.getElementById("openGalleryBtn"),themeToggle:document.getElementById("themeToggle")},i={days:30,includeEmpty:!0,search:"",shares:[],selectedHash:null},R="droppr_gallery_prefs";function D(){try{return JSON.parse(localStorage.getItem(R)||"{}")}catch{return{}}}function J(e){try{localStorage.setItem(R,JSON.stringify({...D(),...e}))}catch{}}function H(){return D().theme||"dark"}function A(e){const s=e==="dark";document.documentElement.setAttribute("data-theme",e),t.themeToggle&&(t.themeToggle.textContent=s?"🌙":"☀️",t.themeToggle.title=s?"Switch to light theme":"Switch to dark theme"),J({theme:e})}function j(){const e=H();A(e==="dark"?"light":"dark")}function q(){const e=H();A(e),t.themeToggle&&t.themeToggle.addEventListener("click",j)}q();function o(e){return e==null?"—":Intl.NumberFormat().format(e)}function m(e){return e?new Date(e*1e3).toLocaleString():"—"}function y(e,{error:s=!1}={}){t.status&&(t.status.textContent=e||"",t.status.className="status"+(s?" error":""))}function u(e){const s=e instanceof Error?e.message:String(e||"Unknown error");y(s,{error:!0})}window.addEventListener("error",e=>{e!=null&&e.message&&u(new Error(e.message))});window.addEventListener("unhandledrejection",e=>{if(!e)return;const s=e.reason;u(s instanceof Error?s:new Error(String(s||"Unhandled promise rejection")))});async function O(e){const s={},a=await M();a?s.Authorization=`Bearer ${a}`:h&&(s["X-Auth"]=h);const n=await fetch(e,{headers:s,cache:"no-store"});if(n.status===401)return window.location.href="/login?redirect="+encodeURIComponent("/analytics"),null;if(!n.ok){const d=await n.text().catch(()=>"");throw new Error(`Request failed (${n.status}): ${d||n.statusText}`)}return await n.json()}function P(){var a;const e=i.search.trim().toLowerCase(),s=i.shares.filter(n=>!i.includeEmpty&&n.downloads===0&&n.gallery_views===0?!1:e?(n.hash||"").toLowerCase().includes(e)||(n.path||"").toLowerCase().includes(e):!0);if(t.sharesCount&&(t.sharesCount.textContent=`${o(s.length)} shares`),t.sharesBody&&(t.sharesBody.innerHTML=""),s.length===0){t.sharesBody&&(t.sharesBody.innerHTML='<tr><td colspan="6" class="muted">No shares match your filters.</td></tr>');return}for(const n of s){const d=n.path?`<div>${l(n.path)}</div><div class="muted mono">${l(n.hash)}</div>`:`<div class="mono">${l(n.hash)}</div>`,c=n.deleted?'<span class="tag warn">deleted</span>':"",r=n.downloads>0?`<span class="tag good">${o(n.downloads)}</span>`:`<span class="tag">${o(n.downloads)}</span>`,p=document.createElement("tr");p.innerHTML=`
+const C = "droppr_access_token",
+  b = "droppr_refresh_token",
+  x = "droppr_otp_code";
+function U() {
+  try {
+    const e = localStorage.getItem("jwt");
+    return e ? String(e) : null;
+  } catch {
+    return null;
+  }
+}
+function w(e) {
+  if (!e) return null;
+  try {
+    const s = String(e).split(".");
+    if (s.length !== 3) return null;
+    const a = s[1].replace(/-/g, "+").replace(/_/g, "/"),
+      n = a.length % 4 ? "====".slice(a.length % 4) : "";
+    return JSON.parse(atob(a + n));
+  } catch {
+    return null;
+  }
+}
+function F() {
+  try {
+    const e = localStorage.getItem(C),
+      s = localStorage.getItem(b),
+      a = w(e),
+      n = w(s);
+    return {
+      access: e,
+      refresh: s,
+      accessExp: a != null && a.exp ? a.exp * 1e3 : 0,
+      refreshExp: n != null && n.exp ? n.exp * 1e3 : 0,
+    };
+  } catch {
+    return { access: null, refresh: null, accessExp: 0, refreshExp: 0 };
+  }
+}
+function N() {
+  try {
+    return sessionStorage.getItem(x) || "";
+  } catch {
+    return "";
+  }
+}
+function z() {
+  const e = window.prompt("Enter your 2FA code:");
+  if (e) {
+    try {
+      sessionStorage.setItem(x, String(e));
+    } catch {}
+    return e;
+  }
+  return "";
+}
+async function k(e, s = !0) {
+  if (!e) return null;
+  const a = { Authorization: `Bearer ${e}` },
+    n = N();
+  n && (a["X-Droppr-OTP"] = n);
+  const d = await fetch("/api/droppr/auth/refresh", { method: "POST", headers: a }),
+    c = await d.text().catch(() => "");
+  let r = null;
+  if (c)
+    try {
+      r = JSON.parse(c);
+    } catch {}
+  if (d.status === 401 && r != null && r.otp_required && s) return z() ? k(e, !1) : null;
+  if (!d.ok || !(r != null && r.access_token)) return null;
+  try {
+    (localStorage.setItem(C, r.access_token),
+      r.refresh_token && localStorage.setItem(b, r.refresh_token));
+  } catch {}
+  return r.access_token;
+}
+async function M() {
+  const e = F(),
+    s = Date.now();
+  return e.access && e.accessExp > s + 6e4
+    ? e.access
+    : e.refresh && e.refreshExp > s + 6e4
+      ? await k(e.refresh, !0)
+      : null;
+}
+const h = U(),
+  t = {
+    rangeLabel: document.getElementById("rangeLabel"),
+    rangeSelect: document.getElementById("rangeSelect"),
+    refresh: document.getElementById("refreshBtn"),
+    search: document.getElementById("searchInput"),
+    includeEmpty: document.getElementById("includeEmpty"),
+    sharesBody: document.getElementById("sharesBody"),
+    sharesCount: document.getElementById("sharesCount"),
+    status: document.getElementById("status"),
+    metricDownloads: document.getElementById("metricDownloads"),
+    metricZip: document.getElementById("metricZip"),
+    metricFiles: document.getElementById("metricFiles"),
+    metricViews: document.getElementById("metricViews"),
+    modal: document.getElementById("detailModal"),
+    modalClose: document.getElementById("detailClose"),
+    detailTitle: document.getElementById("detailTitle"),
+    detailSub: document.getElementById("detailSub"),
+    detailMetrics: document.getElementById("detailMetrics"),
+    ipsBody: document.getElementById("ipsBody"),
+    eventsBody: document.getElementById("eventsBody"),
+    exportCsv: document.getElementById("exportCsvBtn"),
+    openGallery: document.getElementById("openGalleryBtn"),
+    themeToggle: document.getElementById("themeToggle"),
+  },
+  i = { days: 30, includeEmpty: !0, search: "", shares: [], selectedHash: null },
+  R = "droppr_gallery_prefs";
+function D() {
+  try {
+    return JSON.parse(localStorage.getItem(R) || "{}");
+  } catch {
+    return {};
+  }
+}
+function J(e) {
+  try {
+    localStorage.setItem(R, JSON.stringify({ ...D(), ...e }));
+  } catch {}
+}
+function H() {
+  return D().theme || "dark";
+}
+function A(e) {
+  const s = e === "dark";
+  (document.documentElement.setAttribute("data-theme", e),
+    t.themeToggle &&
+      ((t.themeToggle.textContent = s ? "🌙" : "☀️"),
+      (t.themeToggle.title = s ? "Switch to light theme" : "Switch to dark theme")),
+    J({ theme: e }));
+}
+function j() {
+  const e = H();
+  A(e === "dark" ? "light" : "dark");
+}
+function q() {
+  const e = H();
+  (A(e), t.themeToggle && t.themeToggle.addEventListener("click", j));
+}
+q();
+function o(e) {
+  return e == null ? "—" : Intl.NumberFormat().format(e);
+}
+function m(e) {
+  return e ? new Date(e * 1e3).toLocaleString() : "—";
+}
+function y(e, { error: s = !1 } = {}) {
+  t.status &&
+    ((t.status.textContent = e || ""), (t.status.className = "status" + (s ? " error" : "")));
+}
+function u(e) {
+  const s = e instanceof Error ? e.message : String(e || "Unknown error");
+  y(s, { error: !0 });
+}
+window.addEventListener("error", (e) => {
+  e != null && e.message && u(new Error(e.message));
+});
+window.addEventListener("unhandledrejection", (e) => {
+  if (!e) return;
+  const s = e.reason;
+  u(s instanceof Error ? s : new Error(String(s || "Unhandled promise rejection")));
+});
+async function O(e) {
+  const s = {},
+    a = await M();
+  a ? (s.Authorization = `Bearer ${a}`) : h && (s["X-Auth"] = h);
+  const n = await fetch(e, { headers: s, cache: "no-store" });
+  if (n.status === 401)
+    return ((window.location.href = "/login?redirect=" + encodeURIComponent("/analytics")), null);
+  if (!n.ok) {
+    const d = await n.text().catch(() => "");
+    throw new Error(`Request failed (${n.status}): ${d || n.statusText}`);
+  }
+  return await n.json();
+}
+function P() {
+  var a;
+  const e = i.search.trim().toLowerCase(),
+    s = i.shares.filter((n) =>
+      !i.includeEmpty && n.downloads === 0 && n.gallery_views === 0
+        ? !1
+        : e
+          ? (n.hash || "").toLowerCase().includes(e) || (n.path || "").toLowerCase().includes(e)
+          : !0
+    );
+  if (
+    (t.sharesCount && (t.sharesCount.textContent = `${o(s.length)} shares`),
+    t.sharesBody && (t.sharesBody.innerHTML = ""),
+    s.length === 0)
+  ) {
+    t.sharesBody &&
+      (t.sharesBody.innerHTML =
+        '<tr><td colspan="6" class="muted">No shares match your filters.</td></tr>');
+    return;
+  }
+  for (const n of s) {
+    const d = n.path
+        ? `<div>${l(n.path)}</div><div class="muted mono">${l(n.hash)}</div>`
+        : `<div class="mono">${l(n.hash)}</div>`,
+      c = n.deleted ? '<span class="tag warn">deleted</span>' : "",
+      r =
+        n.downloads > 0
+          ? `<span class="tag good">${o(n.downloads)}</span>`
+          : `<span class="tag">${o(n.downloads)}</span>`,
+      p = document.createElement("tr");
+    ((p.innerHTML = `
         <td>${d}<div style="margin-top:0.35rem;">${c}</div></td>
         <td>${r}<div class="muted" style="margin-top:0.25rem;">ZIP ${o(n.zip_downloads)} • Files ${o(n.file_downloads)}</div></td>
         <td>${o(n.gallery_views)}</td>
@@ -10,24 +219,198 @@ const C="droppr_access_token",b="droppr_refresh_token",x="droppr_otp_code";funct
                 <button class="btn secondary" type="button" data-detail="${l(n.hash)}">Details</button>
             </div>
         </td>
-    `,(a=t.sharesBody)==null||a.appendChild(p)}}function l(e){return String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}function K(e){t.metricDownloads&&(t.metricDownloads.textContent=o(e.downloads??0)),t.metricZip&&(t.metricZip.textContent=o(e.zip_downloads??0)),t.metricFiles&&(t.metricFiles.textContent=o(e.file_downloads??0)),t.metricViews&&(t.metricViews.textContent=o(e.gallery_views??0))}async function f(){var c,r;y(""),t.sharesBody&&(t.sharesBody.innerHTML='<tr><td colspan="6" class="muted">Loading…</td></tr>');const e=i.days,s=i.includeEmpty,a=await O(`/api/analytics/shares?days=${encodeURIComponent(e)}&include_empty=${s?"1":"0"}`);if(!a)return;i.shares=Array.isArray(a.shares)?a.shares:[],K(a.totals||{});const n=(c=a.range)==null?void 0:c.since,d=(r=a.range)==null?void 0:r.until;t.rangeLabel&&(t.rangeLabel.textContent=n&&d?`${m(n)} → ${m(d)}`:"—"),P()}function Z(){var e;(e=t.modal)==null||e.classList.add("show")}function v(){var e;(e=t.modal)==null||e.classList.remove("show"),i.selectedHash=null}function G(e){var d,c;const s=e.counts||{},a=(s.file_download||0)+(s.zip_download||0),n=s.gallery_view||0;t.detailMetrics&&(t.detailMetrics.innerHTML=`
+    `),
+      (a = t.sharesBody) == null || a.appendChild(p));
+  }
+}
+function l(e) {
+  return String(e)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+function K(e) {
+  (t.metricDownloads && (t.metricDownloads.textContent = o(e.downloads ?? 0)),
+    t.metricZip && (t.metricZip.textContent = o(e.zip_downloads ?? 0)),
+    t.metricFiles && (t.metricFiles.textContent = o(e.file_downloads ?? 0)),
+    t.metricViews && (t.metricViews.textContent = o(e.gallery_views ?? 0)));
+}
+async function f() {
+  var c, r;
+  (y(""),
+    t.sharesBody &&
+      (t.sharesBody.innerHTML = '<tr><td colspan="6" class="muted">Loading…</td></tr>'));
+  const e = i.days,
+    s = i.includeEmpty,
+    a = await O(
+      `/api/analytics/shares?days=${encodeURIComponent(e)}&include_empty=${s ? "1" : "0"}`
+    );
+  if (!a) return;
+  ((i.shares = Array.isArray(a.shares) ? a.shares : []), K(a.totals || {}));
+  const n = (c = a.range) == null ? void 0 : c.since,
+    d = (r = a.range) == null ? void 0 : r.until;
+  (t.rangeLabel && (t.rangeLabel.textContent = n && d ? `${m(n)} → ${m(d)}` : "—"), P());
+}
+function Z() {
+  var e;
+  (e = t.modal) == null || e.classList.add("show");
+}
+function v() {
+  var e;
+  ((e = t.modal) == null || e.classList.remove("show"), (i.selectedHash = null));
+}
+function G(e) {
+  var d, c;
+  const s = e.counts || {},
+    a = (s.file_download || 0) + (s.zip_download || 0),
+    n = s.gallery_view || 0;
+  t.detailMetrics &&
+    (t.detailMetrics.innerHTML = `
         <div class="detail-card"><div class="label">Downloads</div><div class="value">${o(a)}</div></div>
-        <div class="detail-card"><div class="label">ZIP Downloads</div><div class="value">${o(s.zip_download||0)}</div></div>
-        <div class="detail-card"><div class="label">File Downloads</div><div class="value">${o(s.file_download||0)}</div></div>
+        <div class="detail-card"><div class="label">ZIP Downloads</div><div class="value">${o(s.zip_download || 0)}</div></div>
+        <div class="detail-card"><div class="label">File Downloads</div><div class="value">${o(s.file_download || 0)}</div></div>
         <div class="detail-card"><div class="label">Gallery Views</div><div class="value">${o(n)}</div></div>
-        <div class="detail-card"><div class="label">Unique IPs</div><div class="value">${o((e.ips||[]).length)}</div></div>
-        <div class="detail-card"><div class="label">Last Event</div><div class="value">${m(((c=(d=e.events)==null?void 0:d[0])==null?void 0:c.created_at)||null)}</div></div>
-    `)}function V(e){const s=Array.isArray(e.ips)?e.ips:[];if(s.length===0){t.ipsBody&&(t.ipsBody.innerHTML='<tr><td colspan="5" class="muted">No IP data (or IP logging disabled).</td></tr>');return}if(t.ipsBody){t.ipsBody.innerHTML="";for(const a of s){const n=document.createElement("tr");n.innerHTML=`
+        <div class="detail-card"><div class="label">Unique IPs</div><div class="value">${o((e.ips || []).length)}</div></div>
+        <div class="detail-card"><div class="label">Last Event</div><div class="value">${m(((c = (d = e.events) == null ? void 0 : d[0]) == null ? void 0 : c.created_at) || null)}</div></div>
+    `);
+}
+function V(e) {
+  const s = Array.isArray(e.ips) ? e.ips : [];
+  if (s.length === 0) {
+    t.ipsBody &&
+      (t.ipsBody.innerHTML =
+        '<tr><td colspan="5" class="muted">No IP data (or IP logging disabled).</td></tr>');
+    return;
+  }
+  if (t.ipsBody) {
+    t.ipsBody.innerHTML = "";
+    for (const a of s) {
+      const n = document.createElement("tr");
+      ((n.innerHTML = `
           <td class="mono">${l(a.ip)}</td>
           <td>${o(a.downloads)}</td>
           <td>${o(a.zip_downloads)}</td>
           <td>${o(a.file_downloads)}</td>
           <td>${m(a.last_seen)}</td>
-      `,t.ipsBody.appendChild(n)}}}function Y(e){const s=Array.isArray(e.events)?e.events:[];if(s.length===0){t.eventsBody&&(t.eventsBody.innerHTML='<tr><td colspan="5" class="muted">No events yet.</td></tr>');return}if(t.eventsBody){t.eventsBody.innerHTML="";for(const a of s.slice(0,200)){const n=document.createElement("tr");n.innerHTML=`
+      `),
+        t.ipsBody.appendChild(n));
+    }
+  }
+}
+function Y(e) {
+  const s = Array.isArray(e.events) ? e.events : [];
+  if (s.length === 0) {
+    t.eventsBody &&
+      (t.eventsBody.innerHTML = '<tr><td colspan="5" class="muted">No events yet.</td></tr>');
+    return;
+  }
+  if (t.eventsBody) {
+    t.eventsBody.innerHTML = "";
+    for (const a of s.slice(0, 200)) {
+      const n = document.createElement("tr");
+      ((n.innerHTML = `
           <td>${m(a.created_at)}</td>
           <td class="mono">${l(a.event_type)}</td>
-          <td class="mono">${l(a.ip||"")}</td>
-          <td class="mono">${l(a.file_path||"")}</td>
-          <td class="muted">${l(a.user_agent||"")}</td>
-      `,t.eventsBody.appendChild(n)}}}async function X(e){y(""),i.selectedHash=e,t.detailTitle&&(t.detailTitle.textContent="Loading…"),t.detailSub&&(t.detailSub.textContent=""),t.ipsBody&&(t.ipsBody.innerHTML='<tr><td colspan="5" class="muted">Loading…</td></tr>'),t.eventsBody&&(t.eventsBody.innerHTML='<tr><td colspan="5" class="muted">Loading…</td></tr>'),Z();const s=await O(`/api/analytics/shares/${encodeURIComponent(e)}?days=${encodeURIComponent(i.days)}`);if(!s)return;const a=s.share||{};t.detailTitle&&(t.detailTitle.textContent=a.path?`${a.path}`:`${a.hash}`),t.detailSub&&(t.detailSub.textContent=a.path?a.hash:""),t.openGallery&&(t.openGallery.href=a.shareUrl||`/gallery/${e}`),G(s),V(s),Y(s)}async function Q(e){const s={},a=await M();a?s.Authorization=`Bearer ${a}`:h&&(s["X-Auth"]=h);const n=await fetch(`/api/analytics/shares/${encodeURIComponent(e)}/export.csv?days=${encodeURIComponent(i.days)}`,{headers:s,cache:"no-store"});if(n.status===401){window.location.href="/login?redirect="+encodeURIComponent("/analytics");return}if(!n.ok){const p=await n.text().catch(()=>"");throw new Error(`Export failed (${n.status}): ${p||n.statusText}`)}const d=await n.blob(),c=URL.createObjectURL(d),r=document.createElement("a");r.href=c,r.download=`droppr-share-${e}-analytics.csv`,document.body.appendChild(r),r.click(),r.remove(),URL.revokeObjectURL(c)}var E;(E=t.rangeSelect)==null||E.addEventListener("change",()=>{i.days=parseInt(t.rangeSelect.value,10),f().catch(u)});var B;(B=t.refresh)==null||B.addEventListener("click",()=>f().catch(u));let g=null;var $;($=t.search)==null||$.addEventListener("input",()=>{g&&clearTimeout(g),g=setTimeout(()=>{i.search=t.search.value,P()},150)});var I;(I=t.includeEmpty)==null||I.addEventListener("change",()=>{i.includeEmpty=t.includeEmpty.checked,f().catch(u)});var _;(_=t.sharesBody)==null||_.addEventListener("click",e=>{const a=e.target.closest("button[data-detail]");if(!a)return;const n=a.getAttribute("data-detail");n&&X(n).catch(u)});var T;(T=t.modalClose)==null||T.addEventListener("click",v);var L;(L=t.modal)==null||L.addEventListener("click",e=>{e.target===t.modal&&v()});document.addEventListener("keydown",e=>{e.key==="Escape"&&v()});var S;(S=t.exportCsv)==null||S.addEventListener("click",()=>{i.selectedHash&&Q(i.selectedHash).catch(u)});f().catch(u);
+          <td class="mono">${l(a.ip || "")}</td>
+          <td class="mono">${l(a.file_path || "")}</td>
+          <td class="muted">${l(a.user_agent || "")}</td>
+      `),
+        t.eventsBody.appendChild(n));
+    }
+  }
+}
+async function X(e) {
+  (y(""),
+    (i.selectedHash = e),
+    t.detailTitle && (t.detailTitle.textContent = "Loading…"),
+    t.detailSub && (t.detailSub.textContent = ""),
+    t.ipsBody && (t.ipsBody.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>'),
+    t.eventsBody &&
+      (t.eventsBody.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>'),
+    Z());
+  const s = await O(
+    `/api/analytics/shares/${encodeURIComponent(e)}?days=${encodeURIComponent(i.days)}`
+  );
+  if (!s) return;
+  const a = s.share || {};
+  (t.detailTitle && (t.detailTitle.textContent = a.path ? `${a.path}` : `${a.hash}`),
+    t.detailSub && (t.detailSub.textContent = a.path ? a.hash : ""),
+    t.openGallery && (t.openGallery.href = a.shareUrl || `/gallery/${e}`),
+    G(s),
+    V(s),
+    Y(s));
+}
+async function Q(e) {
+  const s = {},
+    a = await M();
+  a ? (s.Authorization = `Bearer ${a}`) : h && (s["X-Auth"] = h);
+  const n = await fetch(
+    `/api/analytics/shares/${encodeURIComponent(e)}/export.csv?days=${encodeURIComponent(i.days)}`,
+    { headers: s, cache: "no-store" }
+  );
+  if (n.status === 401) {
+    window.location.href = "/login?redirect=" + encodeURIComponent("/analytics");
+    return;
+  }
+  if (!n.ok) {
+    const p = await n.text().catch(() => "");
+    throw new Error(`Export failed (${n.status}): ${p || n.statusText}`);
+  }
+  const d = await n.blob(),
+    c = URL.createObjectURL(d),
+    r = document.createElement("a");
+  ((r.href = c),
+    (r.download = `droppr-share-${e}-analytics.csv`),
+    document.body.appendChild(r),
+    r.click(),
+    r.remove(),
+    URL.revokeObjectURL(c));
+}
+var E;
+(E = t.rangeSelect) == null ||
+  E.addEventListener("change", () => {
+    ((i.days = parseInt(t.rangeSelect.value, 10)), f().catch(u));
+  });
+var B;
+(B = t.refresh) == null || B.addEventListener("click", () => f().catch(u));
+let g = null;
+var $;
+($ = t.search) == null ||
+  $.addEventListener("input", () => {
+    (g && clearTimeout(g),
+      (g = setTimeout(() => {
+        ((i.search = t.search.value), P());
+      }, 150)));
+  });
+var I;
+(I = t.includeEmpty) == null ||
+  I.addEventListener("change", () => {
+    ((i.includeEmpty = t.includeEmpty.checked), f().catch(u));
+  });
+var _;
+(_ = t.sharesBody) == null ||
+  _.addEventListener("click", (e) => {
+    const a = e.target.closest("button[data-detail]");
+    if (!a) return;
+    const n = a.getAttribute("data-detail");
+    n && X(n).catch(u);
+  });
+var T;
+(T = t.modalClose) == null || T.addEventListener("click", v);
+var L;
+(L = t.modal) == null ||
+  L.addEventListener("click", (e) => {
+    e.target === t.modal && v();
+  });
+document.addEventListener("keydown", (e) => {
+  e.key === "Escape" && v();
+});
+var S;
+(S = t.exportCsv) == null ||
+  S.addEventListener("click", () => {
+    i.selectedHash && Q(i.selectedHash).catch(u);
+  });
+f().catch(u);
 //# sourceMappingURL=analytics.js.map

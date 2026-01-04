@@ -1,0 +1,74 @@
+{{- if .Values.celeryWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "droppr.fullname" . }}-celery-worker
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "droppr.celeryWorker.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.celeryWorker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "droppr.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-worker
+  template:
+    metadata:
+      labels:
+        {{- include "droppr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-worker
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: celery-worker
+        image: "{{ .Values.celeryWorker.image.repository }}:{{ .Values.celeryWorker.image.tag }}"
+        imagePullPolicy: {{ .Values.celeryWorker.image.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        command:
+        - celery
+        - -A
+        - app.legacy:celery_app
+        - worker
+        - --loglevel=info
+        - --concurrency={{ .Values.celeryWorker.concurrency }}
+        env:
+        - name: C_FORCE_ROOT
+          value: "true"
+        envFrom:
+        - configMapRef:
+            name: {{ include "droppr.fullname" . }}-config
+        - secretRef:
+            name: {{ include "droppr.fullname" . }}-secrets
+        volumeMounts:
+        - name: media-storage
+          mountPath: /media
+        - name: cache-storage
+          mountPath: /data
+        resources:
+          {{- toYaml .Values.celeryWorker.resources | nindent 10 }}
+      volumes:
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistence.media.existingClaim | default (printf "%s-media-pvc" (include "droppr.fullname" .)) }}
+      - name: cache-storage
+        persistentVolumeClaim:
+          claimName: {{ .Values.persistence.cache.existingClaim | default (printf "%s-cache-pvc" (include "droppr.fullname" .)) }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

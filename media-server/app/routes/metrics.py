@@ -15,4 +15,4 @@ def metrics():
     if not METRICS_ENABLED:
         return jsonify({"error": "Metrics disabled"}), 404
     registry = _get_metrics_registry()
-    return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
+    return Response(generate_latest(registry), content_type=CONTENT_TYPE_LATEST)

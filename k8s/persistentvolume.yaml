@@ -1,0 +1,41 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: droppr-media-pvc
+  namespace: droppr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client  # Change to your storage class
+  resources:
+    requests:
+      storage: 500Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: droppr-database-pvc
+  namespace: droppr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard  # Change to your storage class
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: droppr-cache-pvc
+  namespace: droppr
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client  # Change to your storage class
+  resources:
+    requests:
+      storage: 100Gi

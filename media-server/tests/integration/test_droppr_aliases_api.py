@@ -47,3 +47,17 @@ def test_list_share_aliases_error(client):
         resp = client.get("/api/droppr/shares/aliases")
         assert resp.status_code == 500
         assert "Failed to list share aliases" in resp.get_json()["error"]
+
+
+def test_list_share_aliases_search_filter(client):
+    mock_aliases = [
+        {"from_hash": "abc123", "to_hash": "def", "path": "/media"},
+        {"from_hash": "xyz789", "to_hash": "ghi", "path": "/other"},
+    ]
+
+    with patch("app.routes.droppr_aliases._list_share_aliases", return_value=mock_aliases):
+        resp = client.get("/api/droppr/shares/aliases?search=MEDIA")
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert len(data["aliases"]) == 1
+        assert data["aliases"][0]["from_hash"] == "abc123"

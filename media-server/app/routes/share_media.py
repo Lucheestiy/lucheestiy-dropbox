@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import subprocess
-import time
 from urllib.parse import quote
 
 from flask import Blueprint, Response, jsonify, redirect, request
@@ -54,8 +53,6 @@ def create_share_media_blueprint(deps: dict):
     ensure_hd_mp4 = deps["ensure_hd_mp4"]
     hls_renditions = deps["hls_renditions"]
     ensure_video_meta_record = deps["ensure_video_meta_record"]
-    video_transcode_count = deps["video_transcode_count"]
-    video_transcode_latency = deps["video_transcode_latency"]
     thumbnail_count = deps["thumbnail_count"]
 
     bp = Blueprint("share_media", __name__)
@@ -199,8 +196,7 @@ def create_share_media_blueprint(deps: dict):
                         result = subprocess.run(
                             cmd,
                             check=False,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            capture_output=True,
                             timeout=thumb_ffmpeg_timeout_seconds,
                         )
                         if result.returncode != 0 and is_video:
@@ -214,13 +210,11 @@ def create_share_media_blueprint(deps: dict):
                             result = subprocess.run(
                                 cmd,
                                 check=False,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
+                                capture_output=True,
                                 timeout=thumb_ffmpeg_timeout_seconds,
                             )
                         return result
 
-                    start_time = time.perf_counter()
                     with thumb_sema:
                         result = run_thumb(fmt, cache_path)
 

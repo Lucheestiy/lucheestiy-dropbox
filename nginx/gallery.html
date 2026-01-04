@@ -163,7 +163,11 @@
           <button class="retry-btn" onclick="location.reload()">Try Again</button>
           <button
             class="retry-btn secondary"
-            onclick="if(confirm('This will clear browser cache and reload. Continue?')){ window.location.href = window.location.pathname + '?refresh=1&v=' + Date.now(); }"
+            onclick="
+              if (confirm('This will clear browser cache and reload. Continue?')) {
+                window.location.href = window.location.pathname + '?refresh=1&v=' + Date.now();
+              }
+            "
           >
             Clear Cache
           </button>
@@ -271,7 +275,12 @@
           <form id="commentForm" class="comment-form">
             <div class="comment-input-group">
               <input type="text" id="commentAuthor" placeholder="Your name" maxlength="50" />
-              <textarea id="commentContent" placeholder="Write a comment..." required maxlength="2000"></textarea>
+              <textarea
+                id="commentContent"
+                placeholder="Write a comment..."
+                required
+                maxlength="2000"
+              ></textarea>
             </div>
             <button type="submit" class="action-btn">Post</button>
           </form>

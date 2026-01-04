@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: droppr-config
+  namespace: droppr
+data:
+  # FileBrowser settings
+  DROPPR_FILEBROWSER_BASE_URL: "http://filebrowser-service:80"
+
+  # Redis settings
+  DROPPR_REDIS_URL: "redis://redis-service:6379/0"
+  DROPPR_CELERY_BROKER_URL: "redis://redis-service:6379/1"
+  DROPPR_CELERY_RESULT_BACKEND: "redis://redis-service:6379/1"
+
+  # Media processing
+  DROPPR_THUMB_MAX_CONCURRENCY: "2"
+  DROPPR_PROXY_MAX_CONCURRENCY: "2"
+  DROPPR_CACHE_DIR: "/data/thumb-cache"
+  DROPPR_PROXY_CACHE_DIR: "/data/proxy-cache"
+  DROPPR_HLS_CACHE_DIR: "/data/hls-cache"
+
+  # Upload settings
+  DROPPR_UPLOAD_ALLOWED_EXTENSIONS: "jpg,jpeg,png,gif,mp4,mov,pdf,zip,txt"
+  DROPPR_UPLOAD_MAX_SIZE_MB: "500"
+
+  # User management
+  DROPPR_USER_ROOT: "/users"
+  DROPPR_USER_DATA_DIR: "/srv"
+  DROPPR_USER_PASSWORD_MIN_LEN: "12"
+
+  # Analytics
+  DROPPR_ANALYTICS_ENABLED: "true"
+  DROPPR_ANALYTICS_IP_MODE: "anonymized"
+  DROPPR_ANALYTICS_RETENTION_DAYS: "180"
+
+  # Observability
+  DROPPR_LOG_FORMAT: "json"
+  DROPPR_LOG_LEVEL: "INFO"
+  DROPPR_OTEL_ENABLED: "true"
+  DROPPR_OTEL_SERVICE_NAME: "droppr-media-server"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+
+  # Cloudflare R2 (optional)
+  DROPPR_R2_ENABLED: "false"

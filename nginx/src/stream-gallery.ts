@@ -443,7 +443,11 @@ interface StreamElements {
     if (els.errorTitle) els.errorTitle.textContent = title;
     if (els.errorMessage) {
       const suggestion = getRecoverySuggestion(message);
-      els.errorMessage.innerHTML = message + '<br><small style="display:block;margin-top:0.5rem;opacity:0.8">' + suggestion + '</small>';
+      els.errorMessage.innerHTML =
+        message +
+        '<br><small style="display:block;margin-top:0.5rem;opacity:0.8">' +
+        suggestion +
+        "</small>";
     }
     els.errorOverlay?.classList.add("show");
   }

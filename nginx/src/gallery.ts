@@ -1213,7 +1213,7 @@ interface GalleryPrefs {
         throw new Error("Access to this share is restricted.");
       }
       if (!res.ok) throw new Error(`Server returned an error (${res.status}).`);
-      
+
       const data = await res.json();
       if (Array.isArray(data)) {
         state.files = data;

@@ -1,0 +1,112 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }} -n {{ .Values.global.namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Values.global.namespace }}
+
+{{- if .Values.nginx.enabled }}
+
+APPLICATION ACCESS:
+==================
+
+{{- if eq .Values.nginx.service.type "LoadBalancer" }}
+
+Get the application URL by running:
+
+  export SERVICE_IP=$(kubectl get svc {{ include "droppr.fullname" . }}-nginx -n {{ .Values.global.namespace }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  echo "Droppr is available at: http://$SERVICE_IP"
+
+NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+
+{{- else if eq .Values.nginx.service.type "NodePort" }}
+
+Get the application URL by running:
+
+  export NODE_PORT=$(kubectl get svc {{ include "droppr.fullname" . }}-nginx -n {{ .Values.global.namespace }} -o jsonpath='{.spec.ports[0].nodePort}')
+  export NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+  echo "Droppr is available at: http://$NODE_IP:$NODE_PORT"
+
+{{- else if eq .Values.nginx.service.type "ClusterIP" }}
+
+Get the application URL by running:
+
+  kubectl port-forward svc/{{ include "droppr.fullname" . }}-nginx -n {{ .Values.global.namespace }} 8080:{{ .Values.nginx.service.httpPort }}
+
+Then access the application at: http://localhost:8080
+
+{{- end }}
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+INGRESS:
+========
+
+The application is accessible via Ingress at:
+{{- range .Values.ingress.hosts }}
+  - http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+
+{{- end }}
+
+IMPORTANT SECURITY NOTES:
+=========================
+
+{{- if eq .Values.secrets.authSecret "REPLACE_WITH_RANDOM_SECRET" }}
+
+WARNING: You are using the default AUTH_SECRET!
+Please update this value immediately by running:
+
+  helm upgrade {{ .Release.Name }} droppr \
+    --set secrets.authSecret="$(openssl rand -base64 32)" \
+    --reuse-values
+
+{{- end }}
+
+MONITORING:
+===========
+
+{{- if .Values.monitoring.enabled }}
+
+Prometheus metrics are available at:
+  http://{{ include "droppr.fullname" . }}-media-server:{{ .Values.mediaServer.service.port }}/metrics
+
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+ServiceMonitor has been created for Prometheus Operator integration.
+{{- end }}
+{{- end }}
+
+SCALING:
+========
+
+{{- if .Values.mediaServer.autoscaling.enabled }}
+Media Server will autoscale between {{ .Values.mediaServer.autoscaling.minReplicas }}-{{ .Values.mediaServer.autoscaling.maxReplicas }} replicas.
+{{- end }}
+
+{{- if .Values.nginx.autoscaling.enabled }}
+Nginx will autoscale between {{ .Values.nginx.autoscaling.minReplicas }}-{{ .Values.nginx.autoscaling.maxReplicas }} replicas.
+{{- end }}
+
+{{- if .Values.celeryWorker.autoscaling.enabled }}
+Celery workers will autoscale between {{ .Values.celeryWorker.autoscaling.minReplicas }}-{{ .Values.celeryWorker.autoscaling.maxReplicas }} replicas.
+{{- end }}
+
+USEFUL COMMANDS:
+================
+
+Check pod status:
+  kubectl get pods -n {{ .Values.global.namespace }}
+
+View logs:
+  kubectl logs -f -n {{ .Values.global.namespace }} -l app.kubernetes.io/name={{ include "droppr.name" . }}
+
+Execute shell in media server:
+  kubectl exec -it -n {{ .Values.global.namespace }} deployment/{{ include "droppr.fullname" . }}-media-server -- /bin/bash
+
+Scale deployments manually:
+  kubectl scale deployment {{ include "droppr.fullname" . }}-media-server -n {{ .Values.global.namespace }} --replicas=5
+
+For more information, visit: https://github.com/your-org/droppr

@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import time
+from typing import cast
 
 import redis
 
@@ -67,7 +68,7 @@ def _redis_share_cache_get(
     if not client:
         return None
     try:
-        raw = client.get(_redis_share_cache_key(request_hash))
+        raw = cast(str | None, client.get(_redis_share_cache_key(request_hash)))
     except Exception as exc:
         logger.warning("Redis cache get failed: %s", exc)
         return None

@@ -8,6 +8,17 @@ from .config import parse_bool
 
 METRICS_ENABLED = parse_bool(os.environ.get("DROPPR_METRICS_ENABLED", "true"))
 
+REQUEST_LATENCY: Histogram | None
+REQUEST_COUNT: Counter | None
+REQUEST_ERRORS: Counter | None
+REQUEST_IN_FLIGHT: Gauge | None
+SHARE_CACHE_HITS: Counter | None
+SHARE_CACHE_MISSES: Counter | None
+BACKGROUND_TASKS: Gauge | None
+VIDEO_TRANSCODE_COUNT: Counter | None
+VIDEO_TRANSCODE_LATENCY: Histogram | None
+THUMBNAIL_COUNT: Counter | None
+
 if METRICS_ENABLED:
     REQUEST_LATENCY = Histogram(
         "droppr_http_request_duration_seconds",

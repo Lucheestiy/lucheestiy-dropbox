@@ -33,7 +33,7 @@ describe("AutoShareModal", () => {
 
     const copyBtn = document.querySelector('[data-action="copy"]') as HTMLButtonElement;
     copyBtn.click();
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(format.copyText).toHaveBeenCalledWith("http://example.com");
     expect(copyBtn.textContent).toBe("Copied");
@@ -49,7 +49,7 @@ describe("AutoShareModal", () => {
   it("should dismiss the modal", () => {
     const modal = new AutoShareModal();
     modal.show({ url: "http://example.com" });
-    
+
     modal.dismiss();
     expect(document.getElementById("droppr-auto-share-modal")).toBeNull();
   });

@@ -1,28 +1,30 @@
 from __future__ import annotations
 
 import logging
+
 from flask import Blueprint, jsonify, request
-from ..services.comments import _add_comment, _get_comments, _delete_comment
+
 from ..services.analytics import _log_audit_event
-from ..utils.validation import is_valid_share_hash, _safe_rel_path
+from ..services.comments import _add_comment, _get_comments
+from ..utils.validation import _safe_rel_path, is_valid_share_hash
 
 logger = logging.getLogger("droppr.comments")
 
+
 def create_comments_blueprint(deps: dict):
-    resolve_share_hash = deps["resolve_share_hash"]
-    
     bp = Blueprint("comments", __name__)
 
     @bp.route("/api/share/<share_hash>/comments")
     def get_comments(share_hash: str):
         if not is_valid_share_hash(share_hash):
             return jsonify({"error": "Invalid share hash"}), 400
-        
+
         file_path = request.args.get("path") or "/"
         if file_path != "/":
-            file_path = _safe_rel_path(file_path)
-            if not file_path:
+            safe_file_path = _safe_rel_path(file_path)
+            if not safe_file_path:
                 return jsonify({"error": "Invalid file path"}), 400
+            file_path = safe_file_path
 
         try:
             comments = _get_comments(share_hash=share_hash, file_path=file_path)
@@ -35,17 +37,19 @@ def create_comments_blueprint(deps: dict):
     def post_comment(share_hash: str):
         if not is_valid_share_hash(share_hash):
             return jsonify({"error": "Invalid share hash"}), 400
-        
+
         payload = request.get_json(silent=True) or {}
-        file_path = payload.get("path") or "/"
+        raw_file_path = payload.get("path")
+        file_path = raw_file_path if isinstance(raw_file_path, str) and raw_file_path else "/"
         if file_path != "/":
-            file_path = _safe_rel_path(file_path)
-            if not file_path:
+            safe_file_path = _safe_rel_path(file_path)
+            if not safe_file_path:
                 return jsonify({"error": "Invalid file path"}), 400
-        
+            file_path = safe_file_path
+
         author = str(payload.get("author") or "Anonymous").strip()[:50]
         content = str(payload.get("content") or "").strip()
-        
+
         if not content:
             return jsonify({"error": "Comment content is required"}), 400
         if len(content) > 2000:
@@ -56,7 +60,7 @@ def create_comments_blueprint(deps: dict):
                 share_hash=share_hash,
                 file_path=file_path,
                 author=author,
-                content=content
+                content=content,
             )
             _log_audit_event(
                 "post_comment",
@@ -64,8 +68,8 @@ def create_comments_blueprint(deps: dict):
                 detail={
                     "path": file_path,
                     "author": author,
-                    "comment_id": comment.get("id")
-                }
+                    "comment_id": comment.get("id"),
+                },
             )
             return jsonify(comment), 201
         except Exception as exc:

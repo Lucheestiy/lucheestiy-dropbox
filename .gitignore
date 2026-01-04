@@ -19,3 +19,7 @@ cloudflare/creds/*
 
 nginx/node_modules/
 nginx/coverage/
+nginx/playwright-report/
+nginx/test-results/
+
+.venv/

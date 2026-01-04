@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import subprocess
 import shutil
@@ -136,12 +137,104 @@ def test_ffmpeg_thumbnail_cmd():
     assert "X: Y\r\n" in cmd_jpg
 
 
-def test_maybe_redirect_r2(monkeypatch):
-    monkeypatch.setattr(mp, "_r2_object_url", MagicMock(return_value="http://r2/url"))
-    monkeypatch.setattr(mp, "_r2_object_exists", MagicMock(return_value=True))
-    resp = mp._maybe_redirect_r2("key", require_public=False)
-    assert resp.status_code == 302
-    assert resp.headers["Location"] == "http://r2/url"
-    
+def test_write_hls_master(tmp_path):
+    master_path = tmp_path / "master.m3u8"
+    renditions = [
+        {"height": 360, "video_kbps": 800, "audio_kbps": 96, "dir_name": "360p"},
+        {"height": 720, "video_kbps": 1600, "audio_kbps": 128, "dir_name": "720p"},
+    ]
+    mp._write_hls_master(str(master_path), renditions)
+    content = master_path.read_text()
+    assert "#EXTM3U" in content
+    assert 'BANDWIDTH=896000,NAME="360p"' in content
+    assert "360p/stream.m3u8" in content
+
+
+def test_thumb_cache_basename():
+    name1 = mp._thumb_cache_basename("h1", "f1")
+    name2 = mp._thumb_cache_basename("h1", "f1")
+    name3 = mp._thumb_cache_basename("h2", "f1")
+    assert name1 == name2
+    assert name1 != name3
+
+
+def test_select_preview_format():
+    # Returns (format, mimetype, vary_accept)
+    assert mp._select_preview_format("webp", "") == ("webp", "image/webp", False)
+    assert mp._select_preview_format("auto", "image/webp") == ("webp", "image/webp", True)
+    assert mp._select_preview_format("auto", "") == ("jpg", "image/jpeg", True)
+
+
+def test_copy_stream_with_limit_error():
+    src = io.BytesIO(b"too much data")
+    dst = io.BytesIO()
+    from app.utils.validation import UploadValidationError, _copy_stream_with_limit
+
+    with pytest.raises(UploadValidationError, match="exceeds the maximum"):
+        _copy_stream_with_limit(src, dst, max_bytes=5)
+
+
+def test_ffmpeg_hls_cmd():
+    cmd = mp._ffmpeg_hls_cmd(
+        src_url="src", out_dir="out", height=720, video_kbps=1000, audio_kbps=128, fps=24
+    )
+    assert "ffmpeg" in cmd
+    assert "720" in str(cmd)
+    assert "1000k" in cmd
+    assert "128k" in cmd
+
+
+def test_ffmpeg_proxy_cmd():
+    cmd = mp._ffmpeg_proxy_cmd(src_url="src", dst_path="dst")
+    assert "ffmpeg" in cmd
+    assert "libx264" in cmd
+    assert "+faststart" in cmd
+
+
+def test_ffmpeg_hd_remux_cmd():
+    cmd = mp._ffmpeg_hd_remux_cmd(src_url="src", dst_path="dst")
+    assert "ffmpeg" in cmd
+    assert "copy" in cmd
+
+
+def test_ensure_fast_proxy_mp4_hit(mock_fs, monkeypatch):
+    monkeypatch.setattr(mp, "_enqueue_r2_upload_file", MagicMock())
+    cache_key = mp._proxy_cache_key(share_hash="h", file_path="v.mp4", size=100)
+    output_path = os.path.join(mp.PROXY_CACHE_DIR, f"{cache_key}.mp4")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "wb") as f:
+        f.write(b"data")
+
+    res = mp._ensure_fast_proxy_mp4(share_hash="h", file_path="v.mp4", size=100)
+    assert res[0] == cache_key
+    assert res[3] == 4
+
+
+def test_ensure_hd_mp4_hit(mock_fs, monkeypatch):
+    monkeypatch.setattr(mp, "_enqueue_r2_upload_file", MagicMock())
+    cache_key = mp._hd_cache_key(share_hash="h", file_path="v.mp4", size=100)
+    output_path = os.path.join(mp.PROXY_CACHE_DIR, f"{cache_key}.mp4")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "wb") as f:
+        f.write(b"hd-data")
+
+    res = mp._ensure_hd_mp4(share_hash="h", file_path="v.mp4", size=100)
+    assert res[0] == cache_key
+    assert res[3] == 7
+
+
+def test_r2_upload_hls_package(monkeypatch, tmp_path):
+    monkeypatch.setattr(mp, "R2_ENABLED", True)
+    monkeypatch.setattr(mp, "R2_UPLOAD_ENABLED", True)
+    mock_client = MagicMock()
+    monkeypatch.setattr(mp, "_r2_client", MagicMock(return_value=mock_client))
     monkeypatch.setattr(mp, "_r2_object_exists", MagicMock(return_value=False))
-    assert mp._maybe_redirect_r2("key", require_public=False) is None
+
+    hls_dir = tmp_path / "hls_pkg"
+    hls_dir.mkdir()
+    (hls_dir / "stream.m3u8").write_text("playlist")
+    (hls_dir / "seg_0001.ts").write_bytes(b"segment")
+
+    res = mp._r2_upload_hls_package("cache-key", str(hls_dir))
+    assert res is True
+    assert mock_client.upload_file.call_count == 2

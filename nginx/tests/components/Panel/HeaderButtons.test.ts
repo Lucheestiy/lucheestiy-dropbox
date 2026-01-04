@@ -8,7 +8,7 @@ vi.mock("../../../src/services/auth");
 vi.mock("../../../src/services/admin", () => ({
   adminService: {
     check: vi.fn(),
-  }
+  },
 }));
 
 // Mock the modal classes
@@ -24,19 +24,19 @@ vi.mock("../../../src/components/Panel/RequestModal", () => ({
 }));
 
 describe("HeaderButtons", () => {
-  let originalMutationObserver: any;
+  let originalMutationObserver: typeof MutationObserver;
 
   beforeEach(() => {
     document.body.innerHTML = "";
     vi.clearAllMocks();
-    
+
     // Mock MutationObserver to prevent multiple observers piling up and to simplify testing
-    originalMutationObserver = global.MutationObserver;
-    global.MutationObserver = vi.fn().mockImplementation(() => ({
+    originalMutationObserver = globalThis.MutationObserver;
+    globalThis.MutationObserver = vi.fn().mockImplementation(() => ({
       observe: vi.fn(),
       disconnect: vi.fn(),
       takeRecords: vi.fn(),
-    }));
+    })) as unknown as typeof MutationObserver;
 
     // Default mocks
     vi.mocked(isLoggedIn).mockReturnValue(false);
@@ -44,13 +44,13 @@ describe("HeaderButtons", () => {
   });
 
   afterEach(() => {
-    global.MutationObserver = originalMutationObserver;
+    globalThis.MutationObserver = originalMutationObserver;
   });
 
   it("should show Stream button if URL has share hash", () => {
     // Simulate URL with share hash
     window.history.pushState({}, "Test", "/gallery/somehash");
-    
+
     new HeaderButtons();
     const btn = document.getElementById("droppr-stream-btn") as HTMLAnchorElement;
     expect(btn).toBeTruthy();
@@ -70,15 +70,15 @@ describe("HeaderButtons", () => {
     vi.mocked(adminService.check).mockResolvedValue(true);
 
     new HeaderButtons();
-    
+
     // checkButtons calls ensureAccountsButton which is async
-    // We need to wait for promises to resolve. 
+    // We need to wait for promises to resolve.
     // Since we mocked adminService.check with a resolved promise, we can wait a bit.
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const accountsBtn = document.getElementById("droppr-accounts-btn");
     const requestBtn = document.getElementById("droppr-request-btn");
-    
+
     expect(accountsBtn).toBeTruthy();
     expect(requestBtn).toBeTruthy();
   });
@@ -86,10 +86,10 @@ describe("HeaderButtons", () => {
   it("should NOT show Accounts/Request buttons if not logged in", async () => {
     window.history.pushState({}, "Test", "/files");
     vi.mocked(isLoggedIn).mockReturnValue(false);
-    vi.mocked(adminService.check).mockResolvedValue(true); 
+    vi.mocked(adminService.check).mockResolvedValue(true);
 
     new HeaderButtons();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(document.getElementById("droppr-accounts-btn")).toBeNull();
     expect(document.getElementById("droppr-request-btn")).toBeNull();
@@ -101,19 +101,19 @@ describe("HeaderButtons", () => {
     vi.mocked(adminService.check).mockResolvedValue(false);
 
     new HeaderButtons();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(document.getElementById("droppr-accounts-btn")).toBeNull();
     expect(document.getElementById("droppr-request-btn")).toBeNull();
   });
-  
+
   it("should NOT show Accounts/Request buttons if not on files page", async () => {
     window.history.pushState({}, "Test", "/settings"); // Not starting with /files
     vi.mocked(isLoggedIn).mockReturnValue(true);
     vi.mocked(adminService.check).mockResolvedValue(true);
 
     new HeaderButtons();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(document.getElementById("droppr-accounts-btn")).toBeNull();
     expect(document.getElementById("droppr-request-btn")).toBeNull();

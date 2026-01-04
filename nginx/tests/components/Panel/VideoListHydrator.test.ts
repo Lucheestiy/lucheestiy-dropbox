@@ -19,7 +19,7 @@ describe("VideoListHydrator", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     vi.clearAllMocks();
-    
+
     // Setup a mock file list
     document.body.innerHTML = `
       <div id="listing" class="list">
@@ -35,7 +35,7 @@ describe("VideoListHydrator", () => {
         </div>
       </div>
     `;
-    
+
     window.history.pushState({}, "Test", "/files/");
   });
 
@@ -53,25 +53,25 @@ describe("VideoListHydrator", () => {
   it("should detect video files and call videoMetaService", async () => {
     vi.useFakeTimers();
     new VideoListHydrator();
-    
+
     vi.advanceTimersByTime(300);
     await flush();
-    
+
     expect(videoMetaService.fetch).toHaveBeenCalledWith("/video.mp4");
     vi.useRealTimers();
   });
 
   it("should render metadata details", async () => {
     vi.useFakeTimers();
-    (videoMetaService.fetch as any).mockResolvedValue({
+    vi.mocked(videoMetaService.fetch).mockResolvedValue({
       status: "ready",
       processed_size: 10 * 1024 * 1024,
       uploaded_at: 1600000000,
     });
-    
+
     new VideoListHydrator();
     vi.advanceTimersByTime(300);
-    
+
     await flush();
     await flush();
 
@@ -87,11 +87,11 @@ describe("VideoListHydrator", () => {
     new VideoListHydrator();
     vi.advanceTimersByTime(300);
     await flush();
-    
+
     const img = document.querySelector(".droppr-video-thumb") as HTMLImageElement;
     expect(img).toBeTruthy();
     expect(img.src).toContain("/api/share/__files__/preview/video.mp4");
-    
+
     // In VideoListHydrator.ts, iconEl.style.display = "none" is called.
     // iconEl is row.querySelector(".material-icons, .icon, i")
     const icon = document.querySelector(".material-icons") as HTMLElement;

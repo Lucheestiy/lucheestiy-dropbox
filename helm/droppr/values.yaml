@@ -1,0 +1,321 @@
+## Droppr Helm Chart Configuration
+##
+## This file contains the default configuration values for the Droppr Helm chart.
+## Override these values by providing a custom values.yaml file or using --set flags.
+
+## Global settings
+global:
+  ## Namespace to deploy into
+  namespace: droppr
+
+  ## Image pull secrets (if using private registry)
+  imagePullSecrets: []
+  #  - name: regcred
+
+## Media Server configuration
+mediaServer:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: ghcr.io/your-org/droppr-media-server
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: ClusterIP
+    port: 5000
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  ## Environment variables
+  env:
+    FLASK_ENV: production
+    PYTHONUNBUFFERED: "1"
+
+## Nginx frontend configuration
+nginx:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: ghcr.io/your-org/droppr-nginx
+    tag: latest
+    pullPolicy: Always
+
+  service:
+    type: LoadBalancer
+    httpPort: 80
+    httpsPort: 443
+    ## Set to specific LoadBalancer IP if needed
+    loadBalancerIP: ""
+    annotations: {}
+    #  service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+
+## Celery worker configuration
+celeryWorker:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/your-org/droppr-media-server
+    tag: latest
+    pullPolicy: Always
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "4000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 85
+
+  ## Celery concurrency
+  concurrency: 4
+
+## Redis configuration
+redis:
+  enabled: true
+
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 6379
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  ## Redis persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+  ## Redis configuration
+  config:
+    maxmemory: "512mb"
+    maxmemoryPolicy: "allkeys-lru"
+    appendonly: "yes"
+
+## FileBrowser configuration
+filebrowser:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: filebrowser/filebrowser
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+## PostgreSQL configuration (for analytics)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "CHANGE_ME"
+    database: droppr_analytics
+
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+## Application configuration
+config:
+  ## FileBrowser URL
+  filebrowserBaseUrl: "http://filebrowser-service:80"
+
+  ## Redis URL
+  redisUrl: "redis://redis-service:6379/0"
+
+  ## Celery broker
+  celeryBrokerUrl: "redis://redis-service:6379/1"
+  celeryResultBackend: "redis://redis-service:6379/1"
+
+  ## Media processing
+  thumbMaxConcurrency: 2
+  proxyMaxConcurrency: 2
+
+  ## Upload settings
+  uploadAllowedExtensions: "jpg,jpeg,png,gif,mp4,mov,pdf,zip,txt"
+  uploadMaxSizeMb: 500
+
+  ## User management
+  userRoot: "/users"
+  userDataDir: "/srv"
+  userPasswordMinLen: 12
+
+  ## Analytics
+  analyticsEnabled: true
+  analyticsIpMode: "anonymized"
+  analyticsRetentionDays: 180
+
+  ## Observability
+  logFormat: "json"
+  logLevel: "INFO"
+  otelEnabled: true
+  otelServiceName: "droppr-media-server"
+  otelExporterOtlpEndpoint: "http://otel-collector:4317"
+
+  ## Cloudflare R2 (optional)
+  r2Enabled: false
+
+## Secrets
+## IMPORTANT: Override these in production!
+secrets:
+  ## JWT auth secret
+  authSecret: "REPLACE_WITH_RANDOM_SECRET"
+
+  ## Admin TOTP secret
+  adminTotpSecret: ""
+
+  ## CAPTCHA keys
+  captchaSiteKey: ""
+  captchaSecretKey: ""
+
+  ## Internal signing key
+  internalSigningKey: ""
+
+  ## Sentry DSN
+  sentryDsn: ""
+
+  ## Cloudflare R2
+  r2Endpoint: ""
+  r2Bucket: ""
+  r2AccessKeyId: ""
+  r2SecretAccessKey: ""
+  r2PublicBaseUrl: ""
+
+## Persistent storage
+persistence:
+  ## Media storage (ReadWriteMany required)
+  media:
+    enabled: true
+    accessMode: ReadWriteMany
+    size: 500Gi
+    storageClass: "nfs-client"
+    # existingClaim: ""
+
+  ## Database storage
+  database:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    storageClass: "standard"
+    # existingClaim: ""
+
+  ## Cache storage (ReadWriteMany required)
+  cache:
+    enabled: true
+    accessMode: ReadWriteMany
+    size: 100Gi
+    storageClass: "nfs-client"
+    # existingClaim: ""
+
+## Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/proxy-body-size: "1g"
+  hosts:
+    - host: dropbox.lucheestiy.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: droppr-tls
+    #   hosts:
+    #     - dropbox.lucheestiy.com
+
+## Monitoring (Prometheus)
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+
+## Network policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+## Pod security
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+## Node selectors
+nodeSelector: {}
+
+## Tolerations
+tolerations: []
+
+## Affinity rules
+affinity: {}

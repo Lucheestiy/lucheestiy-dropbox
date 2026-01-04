@@ -217,8 +217,7 @@ def create_droppr_media_blueprint(require_admin_access, deps: dict):
                         result = subprocess.run(
                             cmd,
                             check=False,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            capture_output=True,
                             timeout=thumb_ffmpeg_timeout_seconds,
                         )
                         if result.returncode != 0 and is_video:
@@ -233,8 +232,7 @@ def create_droppr_media_blueprint(require_admin_access, deps: dict):
                             result = subprocess.run(
                                 cmd,
                                 check=False,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
+                                capture_output=True,
                                 timeout=thumb_ffmpeg_timeout_seconds,
                             )
                         return result

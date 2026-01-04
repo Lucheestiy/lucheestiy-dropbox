@@ -1,0 +1,17 @@
+apiVersion: v2
+name: droppr
+description: A Helm chart for Droppr file sharing application
+type: application
+version: 1.0.0
+appVersion: "1.10.0"
+keywords:
+  - file-sharing
+  - dropbox
+  - media
+  - storage
+maintainers:
+  - name: Droppr Team
+    email: admin@droppr.io
+sources:
+  - https://github.com/your-org/droppr
+icon: https://dropbox.lucheestiy.com/static/favicon.svg

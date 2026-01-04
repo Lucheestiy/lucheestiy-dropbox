@@ -19,15 +19,19 @@ REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,128}$")
 class RequestContextFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         if has_request_context():
-            record.request_id = getattr(g, "request_id", None)
-            record.remote_addr = request.headers.get("X-Real-IP") or request.remote_addr
-            record.method = request.method
-            record.path = request.path
+            setattr(record, "request_id", getattr(g, "request_id", None))
+            setattr(
+                record,
+                "remote_addr",
+                request.headers.get("X-Real-IP") or request.remote_addr,
+            )
+            setattr(record, "method", request.method)
+            setattr(record, "path", request.path)
         else:
-            record.request_id = None
-            record.remote_addr = None
-            record.method = None
-            record.path = None
+            setattr(record, "request_id", None)
+            setattr(record, "remote_addr", None)
+            setattr(record, "method", None)
+            setattr(record, "path", None)
         return True
 
 
@@ -39,14 +43,18 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        if record.request_id:
-            payload["request_id"] = record.request_id
-        if record.remote_addr:
-            payload["remote_addr"] = record.remote_addr
-        if record.method:
-            payload["method"] = record.method
-        if record.path:
-            payload["path"] = record.path
+        request_id = getattr(record, "request_id", None)
+        if request_id:
+            payload["request_id"] = request_id
+        remote_addr = getattr(record, "remote_addr", None)
+        if remote_addr:
+            payload["remote_addr"] = remote_addr
+        method = getattr(record, "method", None)
+        if method:
+            payload["method"] = method
+        path = getattr(record, "path", None)
+        if path:
+            payload["path"] = path
         if record.exc_info:
             payload["exc_info"] = self.formatException(record.exc_info)
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=True)

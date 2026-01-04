@@ -13,7 +13,8 @@ from urllib.parse import quote
 import boto3
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
-from flask import Response, redirect
+from flask import redirect
+from werkzeug.wrappers.response import Response as WerkzeugResponse
 
 from ..config import parse_bool
 from ..metrics import VIDEO_TRANSCODE_COUNT, VIDEO_TRANSCODE_LATENCY
@@ -410,7 +411,7 @@ def _r2_upload_hls_package(cache_key: str, output_dir: str) -> bool:
     return True
 
 
-def _maybe_redirect_r2(key: str, *, require_public: bool) -> Response | None:
+def _maybe_redirect_r2(key: str, *, require_public: bool) -> WerkzeugResponse | None:
     url = _r2_object_url(key, require_public=require_public)
     if not url:
         return None
@@ -755,8 +756,7 @@ def _ensure_fast_proxy_mp4(
                 result = subprocess.run(
                     cmd,
                     check=False,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    capture_output=True,
                     timeout=PROXY_FFMPEG_TIMEOUT_SECONDS,
                 )
 
@@ -965,8 +965,7 @@ def _ensure_hd_mp4(
                     result = subprocess.run(
                         cmd,
                         check=False,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        capture_output=True,
                         timeout=HD_FFMPEG_TIMEOUT_SECONDS,
                     )
                 except subprocess.TimeoutExpired:
@@ -1071,8 +1070,7 @@ def _ensure_hls_package(
                 result = subprocess.run(
                     cmd,
                     check=False,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    capture_output=True,
                     timeout=HLS_FFMPEG_TIMEOUT_SECONDS,
                 )
                 if result.returncode != 0:

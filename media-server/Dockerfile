@@ -4,8 +4,9 @@ WORKDIR /app
 
 # Install dependencies
 # ffmpeg: for video thumbnail generation
+# exiftool: for EXIF metadata extraction
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg libimage-exiftool-perl && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-dev.txt ./

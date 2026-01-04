@@ -8,3 +8,10 @@ prometheus-client
 sentry-sdk
 boto3
 SQLAlchemy
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-flask
+opentelemetry-instrumentation-requests
+opentelemetry-instrumentation-celery
+opentelemetry-exporter-otlp
+pillow

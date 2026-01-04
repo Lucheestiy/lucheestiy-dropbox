@@ -36,9 +36,10 @@ def seed_analytics_db(app_module):
     with _analytics_conn() as conn:
         conn.execute("DELETE FROM download_events")
         conn.execute("DELETE FROM auth_events")
-        
+        conn.execute("DELETE FROM audit_events")
+
         now = int(time.time())
-        
+
         conn.execute(
             DownloadEvent.__table__.insert(),
             [
@@ -49,7 +50,7 @@ def seed_analytics_db(app_module):
                     "ip": "1.2.3.4",
                     "user_agent": "Mozilla",
                     "referer": None,
-                    "created_at": now
+                    "created_at": now,
                 },
                 {
                     "share_hash": "hash1",
@@ -58,20 +59,34 @@ def seed_analytics_db(app_module):
                     "ip": "1.2.3.4",
                     "user_agent": "Mozilla",
                     "referer": None,
-                    "created_at": now
+                    "created_at": now,
                 },
-                 {
+                {
                     "share_hash": "hash2",
                     "event_type": "zip_download",
                     "file_path": None,
                     "ip": "5.6.7.8",
                     "user_agent": "Curl",
                     "referer": None,
-                    "created_at": now - 100
+                    "created_at": now - 100,
                 },
-            ]
+            ],
+        )
+
+        conn.execute(
+            "INSERT INTO audit_events (action, target, detail, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("login", "admin", "{}", "1.1.1.1", "Chrome", now),
         )
     return now
+
+
+def test_analytics_audit(client, seed_analytics_db):
+    resp = client.get("/api/analytics/audit")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "events" in data
+    assert len(data["events"]) >= 1
+    assert data["events"][0]["action"] == "login"
 
 
 @patch("app.routes.analytics.get_services")

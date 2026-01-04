@@ -90,13 +90,16 @@ def create_droppr_shares_blueprint(require_admin_access):
                 return jsonify({"error": "Invalid share path"}), 400
 
             if hours is not None:
+                if not isinstance(token, str) or not token:
+                    return jsonify({"error": "Unauthorized"}), 401
                 new_share = services.filebrowser.create_share(
                     token=token, path_encoded=path_encoded, hours=hours
                 )
-                new_hash = new_share.get("hash")
+                new_hash_raw = new_share.get("hash")
                 new_expire = new_share.get("expire")
-                if not is_valid_share_hash(new_hash):
+                if not isinstance(new_hash_raw, str) or not is_valid_share_hash(new_hash_raw):
                     raise RuntimeError("Share API returned invalid hash")
+                new_hash = new_hash_raw
                 target_expire = int(new_expire or 0) if new_expire is not None else None
             else:
                 # If hours not provided, keep existing target_expire and to_hash
@@ -106,7 +109,8 @@ def create_droppr_shares_blueprint(require_admin_access):
                         (share_hash,),
                     ).fetchone()
                     if row:
-                        new_hash = row["to_hash"]
+                        to_hash = row["to_hash"]
+                        new_hash = to_hash if isinstance(to_hash, str) else share_hash
                         target_expire = row["target_expire"]
                     else:
                         new_hash = share_hash

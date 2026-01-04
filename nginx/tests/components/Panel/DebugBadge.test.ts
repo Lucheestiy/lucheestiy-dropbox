@@ -13,19 +13,19 @@ describe("DebugBadge", () => {
   });
 
   it("should render if debug is enabled", () => {
-    (debug.isDropprDebugEnabled as any).mockReturnValue(true);
-    const badge = new DebugBadge();
+    vi.mocked(debug.isDropprDebugEnabled).mockReturnValue(true);
+    new DebugBadge();
     expect(document.getElementById("droppr-debug-badge")).toBeTruthy();
   });
 
   it("should not render if debug is disabled", () => {
-    (debug.isDropprDebugEnabled as any).mockReturnValue(false);
-    const badge = new DebugBadge();
+    vi.mocked(debug.isDropprDebugEnabled).mockReturnValue(false);
+    new DebugBadge();
     expect(document.getElementById("droppr-debug-badge")).toBeNull();
   });
 
   it("should update text", () => {
-    (debug.isDropprDebugEnabled as any).mockReturnValue(true);
+    vi.mocked(debug.isDropprDebugEnabled).mockReturnValue(true);
     const badge = new DebugBadge();
     badge.setText("Updated Text");
     expect(document.getElementById("droppr-debug-badge")?.textContent).toBe("Updated Text");

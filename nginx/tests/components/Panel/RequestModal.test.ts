@@ -42,7 +42,7 @@ describe("RequestModal", () => {
     const wrap = document.getElementById("droppr-request-password-wrap");
 
     expect(wrap?.classList.contains("show")).toBe(false);
-    
+
     toggle.checked = true;
     toggle.dispatchEvent(new Event("change"));
     expect(wrap?.classList.contains("show")).toBe(true);
@@ -57,22 +57,25 @@ describe("RequestModal", () => {
 
     pathInput.value = "/uploads";
 
-    const mockResponse = {
-      ok: true,
-      json: () => Promise.resolve({ url: "/request/abc", hash: "abc" }),
-    };
-    (api.dropprFetch as any).mockResolvedValue(mockResponse);
+    const mockResponse = new Response(JSON.stringify({ url: "/request/abc", hash: "abc" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+    vi.mocked(api.dropprFetch).mockResolvedValue(mockResponse);
 
     createBtn.click();
-    
-    // Wait for the async submit to complete and update the DOM
-    await new Promise(resolve => setTimeout(resolve, 50));
 
-    expect(api.dropprFetch).toHaveBeenCalledWith("/api/droppr/requests", expect.objectContaining({
-      method: "POST",
-      body: JSON.stringify({ path: "/uploads", expires_hours: 0, password: "" }),
-    }));
-    
+    // Wait for the async submit to complete and update the DOM
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(api.dropprFetch).toHaveBeenCalledWith(
+      "/api/droppr/requests",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ path: "/uploads", expires_hours: 0, password: "" }),
+      })
+    );
+
     expect(document.getElementById("droppr-request-result")?.classList.contains("show")).toBe(true);
     const linkInput = document.getElementById("droppr-request-link") as HTMLInputElement;
     expect(linkInput.value).toContain("/request/abc");

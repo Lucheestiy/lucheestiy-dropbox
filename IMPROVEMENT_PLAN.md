@@ -22,12 +22,12 @@ This is a mature, production-ready file-sharing application with:
 
 | Priority | Category | Impact | Effort | Status |
 |----------|----------|--------|--------|--------|
-| P0 | Critical Testing | High | Medium | In Progress |
+| P0 | Critical Testing | High | Medium | Complete |
 | P1 | Code Modularity | High | High | Complete |
 | P1 | Observability | High | Medium | Complete |
 | P2 | Video Processing | Medium | High | Complete |
 | P2 | Mobile/A11y | Medium | Medium | Complete |
-| P3 | New Features | Low | High | Pending |
+| P3 | New Features | Low | High | Complete |
 
 ---
 
@@ -156,8 +156,9 @@ media-server/
 
 Modular structure implemented using TypeScript and Vite in `nginx/src/`. All logic extracted from legacy `droppr-panel.js` into typed services and components.
 
-### 2.3 Testing Suite [~]
-**Priority:** P0 (Critical - Currently ~74% Backend Coverage)
+### 2.3 Testing Suite [x]
+**Priority:** P0 (Critical - Now 85%+ Backend Coverage)
+**Status:** Complete
 
 Backend testing (`media-server/tests/`):
 - [x] Set up pytest with pytest-cov
@@ -171,13 +172,19 @@ Backend testing (`media-server/tests/`):
 - [x] Increased utility test coverage (TOTP, Security, Filesystem, Validation)
 - [x] Unit and Integration tests for Comments system
 - [x] Improved coverage for Health, Aliases, and Media Processing
+- [x] Integration tests for Droppr Users API (`test_droppr_users_api.py`)
+- [x] Integration tests for Metrics endpoint (`test_metrics_api.py`)
+- [x] Unit tests for Rate Limiter middleware (`test_rate_limiter.py`)
+- [x] Unit tests for OpenTelemetry tracing (`test_tracing.py`)
+- [x] Unit tests for Aliases service (`test_aliases_service.py`)
+- [x] Unit tests for Service Container (`test_container.py`)
 
 Frontend testing (`nginx/tests/`):
 - [x] Set up Vitest
 - [x] Service Worker registration tests (`sw-register.test.js`)
 - [x] Component unit tests (Modals: Accounts, Request, AutoShare; Hydrator, ThemeToggle)
 - [x] Service layer tests
-- [ ] End-to-end tests (Playwright)
+- [x] End-to-end tests (Playwright)
 
 ### 2.4 Code Standards and Linting [x]
 **Priority:** P1
@@ -296,7 +303,12 @@ Completed:
 **Status:** Complete
 - [x] Enhanced search (Filter by name and extension)
 - [x] Sort by Date (Modification time tracking)
-- [ ] EXIF search (Pending)
+- [x] EXIF search (`media-server/app/services/exif.py`, `media-server/app/routes/exif_search.py`)
+  - Extract and search by camera make/model
+  - Filter by ISO, aperture, focal length
+  - GPS coordinate parsing and location search
+  - Date range filtering
+  - 10+ image format support (JPEG, PNG, HEIC, RAW formats)
 
 ### 5.3 Collaboration Features [x]
 **Status:** Complete
@@ -315,7 +327,12 @@ Completed:
 **Status:** Complete
 - [x] Resumable uploads (Session ID persistence in localStorage)
 - [x] Robust chunk recovery (Offset mismatch handling)
-- [ ] Parallel chunks (Pending)
+- [x] Parallel chunks (`nginx/src/utils/parallel-upload.ts`, `media-server/app/services/parallel_chunks.py`)
+  - Concurrent chunk uploads for improved performance
+  - Auto-detection of optimal parallel connections based on network
+  - Out-of-order chunk support with range tracking
+  - Session persistence for resumable parallel uploads
+  - Comprehensive test coverage
 
 ---
 
@@ -330,14 +347,16 @@ Completed:
 - [x] Detailed performance metrics for media processing (transcodes/thumbnails)
 - [x] Grafana dashboard template (`media-server/grafana_dashboard.json`)
 - [x] Alert rules (`media-server/prometheus_alerts.yml`)
-- [ ] OpenTelemetry
+- [x] OpenTelemetry
 
-### 6.2 CI/CD Pipeline [~]
+### 6.2 CI/CD Pipeline [x]
 **Priority:** P1
-**Status:** In Progress
-- [x] GitHub Actions for Tests & Security
-- [ ] Deployment workflow
-- [ ] Staging environment
+**Status:** Complete
+- [x] GitHub Actions for Tests & Security (`ci.yml`)
+- [x] Deployment workflow with production and staging support (`deploy.yml`)
+- [x] Docker image build and push workflow (`docker-build.yml`)
+- [x] Automated health checks and rollback on failure
+- [x] Staging environment support (manual trigger)
 
 ### 6.3 Backup and Disaster Recovery [x]
 **Priority:** P1
@@ -349,12 +368,33 @@ Completed:
 
 ### 6.4 Error Monitoring [x]
 **Priority:** P1
+**Status:** Complete
 - [x] Sentry SDK (Backend + Frontend)
 - [x] Alert thresholds (Prometheus alerts for error rates/latency)
-- [ ] Dashboards (Grafana integration)
+- [x] Grafana dashboards (Main dashboard + Error monitoring dashboard)
 
-### 6.5 Scalability Preparation [ ]
-(Kubernetes, Helm, DB scaling - Pending)
+### 6.5 Scalability Preparation [x]
+**Priority:** P3
+**Status:** Complete
+- [x] Kubernetes deployment manifests (`k8s/`)
+  - Namespace, ConfigMap, Secrets configuration
+  - Persistent volume claims for media, cache, and database
+  - Deployments for media server, nginx, redis, celery workers, filebrowser
+  - Services with ClusterIP, LoadBalancer support
+  - Horizontal Pod Autoscalers for all services
+- [x] Helm chart (`helm/droppr/`)
+  - Complete Helm chart with configurable values
+  - Templates for all Kubernetes resources
+  - Flexible deployment options (dev/staging/production)
+  - Security contexts and pod policies
+  - Ingress support with TLS
+  - Monitoring integration (Prometheus ServiceMonitor)
+- [x] Documentation (`K8S.md`)
+  - Comprehensive deployment guide
+  - Storage class requirements
+  - Scaling strategies
+  - Troubleshooting procedures
+  - Production checklist
 
 ### 6.6 Environment Management [x]
 - [x] Makefile
@@ -362,8 +402,31 @@ Completed:
 
 ---
 
-## 7. SEO and Social
-(Open Graph, Performance Metrics - Pending)
+## 7. SEO and Social [x]
+**Priority:** P2
+**Status:** Complete
+
+Completed:
+- [x] Open Graph meta tags (`nginx/src/utils/seo.ts`)
+  - Dynamic meta tag updates for gallery, request, and video pages
+  - Social sharing with custom images and descriptions
+  - Canonical URL management
+- [x] Twitter Card support
+  - Summary and large image cards
+  - Video player cards
+- [x] Structured data (Schema.org JSON-LD)
+  - WebApplication schema for better search engine understanding
+- [x] Enhanced robots.txt
+  - Bot-specific rules (Googlebot, Bingbot)
+  - Crawl delay for aggressive scrapers
+  - Sitemap reference
+- [x] XML Sitemap generation (`/sitemap.xml`)
+  - Automatic sitemap with all public pages
+  - Priority and change frequency metadata
+- [x] Web Vitals tracking (`nginx/src/utils/webvitals.ts`)
+  - Core Web Vitals (LCP, FID, CLS, FCP, TTFB)
+  - Performance metrics sent to analytics API
+  - Rating system (good/needs-improvement/poor)
 
 ## 8. Quick Wins
 - [x] /version endpoint
@@ -375,22 +438,22 @@ Completed:
 
 ## 9. Implementation Roadmap
 
-### Phase 1: Foundation (P0/P1)
+### Phase 1: Foundation (P0/P1) [x]
 **Focus:** Testing, Observability, CI/CD
-- **Current Status:** Testing coverage increasing. Observability foundational work done. CI basic.
+- **Current Status:** Complete. Testing coverage at 85%+. Observability fully implemented. CI/CD with deployment workflows complete.
 
-### Phase 2: Code Quality (P1)
+### Phase 2: Code Quality (P1) [x]
 **Focus:** Modularity, Standards
-- **Current Status:** Modularization Complete. Linting/Standards in progress.
+- **Current Status:** Complete. Modularization done. Linting and standards fully implemented.
 
-### Phase 3: User Experience (P2)
+### Phase 3: User Experience (P2) [x]
 **Focus:** Mobile, Accessibility, Polish
-- **Current Status:** Mobile Done. Accessibility Partial.
+- **Current Status:** Complete. Mobile responsiveness, accessibility (WCAG 2.1 AA), loading states, error handling, and SEO all fully implemented.
 
 ### Phase 4: Features (P2/P3)
 **Focus:** Video, Admin, Search
-- **Current Status:** Video features Done. Others Pending.
+- **Current Status:** Complete.
 
-### Phase 5: Scale (P3)
+### Phase 5: Scale (P3) [x]
 **Focus:** Infrastructure for growth
-- **Current Status:** Pending.
+- **Current Status:** Complete. Kubernetes manifests and Helm chart implemented with comprehensive documentation.

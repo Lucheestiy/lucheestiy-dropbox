@@ -62,8 +62,10 @@ from .routes.droppr_media import create_droppr_media_blueprint
 from .routes.droppr_requests import create_droppr_requests_blueprint
 from .routes.droppr_shares import create_droppr_shares_blueprint
 from .routes.droppr_users import create_droppr_users_blueprint
+from .routes.exif_search import create_exif_search_blueprint
 from .routes.health import health_bp
 from .routes.metrics import metrics_bp
+from .routes.seo import seo_bp
 from .routes.share import create_share_blueprint
 from .routes.share_media import create_share_media_blueprint
 from .services.aliases import (
@@ -139,7 +141,6 @@ from .services.media_processing import (
     _thumb_sema,
     configure_enqueue_task,
 )
-from .services.metrics import METRICS_ENABLED
 from .services.secrets import _load_external_secrets
 from .services.share import (
     _build_file_share_file_list,
@@ -147,6 +148,7 @@ from .services.share import (
 )
 from .services.share_cache import _share_cache_lock, _share_files_cache
 from .services.video_meta import _ensure_video_meta_record, _ffprobe_video_meta
+from .tracing import configure_tracing
 from .utils.config_validation import validate_config
 from .utils.filesystem import _ensure_unique_path
 from .utils.jwt import (
@@ -189,6 +191,7 @@ for key, value in load_flask_config().items():
     app.config.setdefault(key, value)
 
 configure_logging(app)
+configure_tracing(app)
 init_services(app)
 
 
@@ -363,13 +366,15 @@ def _issue_droppr_tokens(
     otp_verified: bool, fb_token: str | None = None, fb_iat: int | None = None
 ) -> dict:
     now = int(time.time())
+    access_exp = now + DROPPR_AUTH_ACCESS_TTL_SECONDS
+    refresh_exp = now + DROPPR_AUTH_REFRESH_TTL_SECONDS
     access_jti = secrets.token_urlsafe(16)
     refresh_jti = secrets.token_urlsafe(24)
 
     access_payload = {
         "iss": DROPPR_AUTH_ISSUER,
         "iat": now,
-        "exp": now + DROPPR_AUTH_ACCESS_TTL_SECONDS,
+        "exp": access_exp,
         "jti": access_jti,
         "typ": "droppr_access",
         "otp": bool(otp_verified),
@@ -377,7 +382,7 @@ def _issue_droppr_tokens(
     refresh_payload = {
         "iss": DROPPR_AUTH_ISSUER,
         "iat": now,
-        "exp": now + DROPPR_AUTH_REFRESH_TTL_SECONDS,
+        "exp": refresh_exp,
         "jti": refresh_jti,
         "typ": "droppr_refresh",
         "otp": bool(otp_verified),
@@ -391,7 +396,7 @@ def _issue_droppr_tokens(
 
     access_token = _encode_jwt(access_payload, DROPPR_AUTH_SECRET)
     refresh_token = _encode_jwt(refresh_payload, DROPPR_AUTH_SECRET)
-    _store_refresh_token(refresh_jti, refresh_payload["exp"], otp_verified)
+    _store_refresh_token(refresh_jti, refresh_exp, bool(otp_verified))
 
     return {
         "access_token": access_token,
@@ -446,7 +451,8 @@ def _record_request_metrics(response) -> None:
         return
     g._metrics_done = True
     if getattr(g, "_metrics_inflight", False):
-        REQUEST_IN_FLIGHT.dec()
+        if REQUEST_IN_FLIGHT is not None:
+            REQUEST_IN_FLIGHT.dec()
         g._metrics_inflight = False
 
     endpoint = request.endpoint or "unknown"
@@ -747,30 +753,30 @@ def _get_share_files(
 ) -> list[dict] | None:
     now = time.time()
     if not force_refresh:
-        cached = _redis_share_cache_get(
+        redis_cached = _redis_share_cache_get(
             request_hash,
             source_hash=source_hash,
             recursive=recursive,
             max_age_seconds=max_age_seconds,
         )
-        if cached is not None:
+        if redis_cached is not None:
             if SHARE_CACHE_HITS is not None and REDIS_ENABLED:
                 SHARE_CACHE_HITS.labels("redis").inc()
-            return cached
+            return redis_cached
         if SHARE_CACHE_MISSES is not None and REDIS_ENABLED:
             SHARE_CACHE_MISSES.labels("redis").inc()
 
         with _share_cache_lock:
-            cached = _share_files_cache.get(request_hash)
+            memory_cached = _share_files_cache.get(request_hash)
             if (
-                cached
-                and (now - cached[0]) < max_age_seconds
-                and cached[1] == source_hash
-                and cached[2] == recursive
+                memory_cached
+                and (now - memory_cached[0]) < max_age_seconds
+                and memory_cached[1] == source_hash
+                and memory_cached[2] == recursive
             ):
                 if SHARE_CACHE_HITS is not None:
                     SHARE_CACHE_HITS.labels("memory").inc()
-                return cached[3]
+                return memory_cached[3]
         if SHARE_CACHE_MISSES is not None:
             SHARE_CACHE_MISSES.labels("memory").inc()
 
@@ -874,6 +880,7 @@ if celery_app:
 
 app.register_blueprint(health_bp)
 app.register_blueprint(metrics_bp)
+app.register_blueprint(seo_bp)
 app.register_blueprint(
     create_share_blueprint(
         {
@@ -948,6 +955,13 @@ app.register_blueprint(
     create_comments_blueprint(
         {
             "resolve_share_hash": _resolve_share_hash,
+        }
+    )
+)
+app.register_blueprint(
+    create_exif_search_blueprint(
+        {
+            "get_share_files": _get_share_files,
         }
     )
 )

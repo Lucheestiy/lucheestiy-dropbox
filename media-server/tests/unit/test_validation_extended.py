@@ -105,11 +105,55 @@ def test_chunk_upload_paths():
     assert "/base/.droppr_uploads/uid123.json" in meta
     assert "/base/.droppr_uploads/uid123.part" in part
 
+def test_sniff_mime_type_more():
+    assert val._sniff_mime_type(b"BM") == "image/bmp"
+    assert val._sniff_mime_type(b"RIFF....WEBP") == "image/webp"
+    assert val._sniff_mime_type(b"\x1a\x45\xdf\xa3") == "video/x-matroska"
+    assert val._sniff_mime_type(b"RIFF....AVI ") == "video/x-msvideo"
+    assert val._sniff_mime_type(b"....ftypqt  ") == "video/quicktime"
+    assert val._sniff_mime_type(b"OggS") == "video/ogg"
+
+
+def test_peek_stream_no_seek():
+    class NoSeek:
+        def read(self, size):
+            return b"data"
+
+    assert val._peek_stream(NoSeek()) == b""
+
+
+def test_validate_upload_type_allow_all(monkeypatch):
+    monkeypatch.setattr(val, "UPLOAD_ALLOW_ALL_EXTS", True)
+    monkeypatch.setattr(val, "EXTENSION_MIME_TYPES", {"jpg": {"image/jpeg"}})
+
+    mock_file = MagicMock()
+    mock_file.mimetype = "image/jpeg"
+    mock_file.stream = io.BytesIO(b"\xff\xd8\xff")
+
+    # Allowed extension, mime matches
+    val._validate_upload_type(mock_file, "test.jpg")
+
+    # Unknown extension, still allowed because UPLOAD_ALLOW_ALL_EXTS is True
+    # but wait, if ext not in EXTENSION_MIME_TYPES, it returns None.
+    val._validate_upload_type(mock_file, "test.unknown")
+
+
+def test_validate_chunk_upload_type(monkeypatch):
+    monkeypatch.setattr(val, "UPLOAD_ALLOW_ALL_EXTS", False)
+    monkeypatch.setattr(val, "UPLOAD_ALLOWED_EXTS", {"jpg"})
+    monkeypatch.setattr(val, "EXTENSION_MIME_TYPES", {"jpg": {"image/jpeg"}})
+
+    val._validate_chunk_upload_type("test.jpg", b"\xff\xd8\xff", "image/jpeg")
+
+    with pytest.raises(val.UploadValidationError, match="Unsupported file type"):
+        val._validate_chunk_upload_type("test.png", b"data", "image/png")
+
+
 def test_load_save_chunk_meta(tmp_path):
     base_dir = str(tmp_path)
     upload_id = "test_upload"
     payload = {"offset": 100, "total": 1000}
-    
+
     val._save_chunk_upload_meta(base_dir, upload_id, payload)
     loaded = val._load_chunk_upload_meta(base_dir, upload_id)
     assert loaded == payload

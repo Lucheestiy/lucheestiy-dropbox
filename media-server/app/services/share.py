@@ -87,31 +87,37 @@ def _build_folder_share_file_list(
                     continue
                 files.append(item)
 
-    result = []
+    result: list[dict] = []
     for item in files:
         raw_path = item.get("path")
         if not isinstance(raw_path, str) or not raw_path:
             continue
-        rel_path = raw_path[1:] if raw_path.startswith("/") else raw_path
-        rel_path = _safe_rel_path(rel_path)
-        if not rel_path:
+        rel_path_candidate = raw_path[1:] if raw_path.startswith("/") else raw_path
+        safe_path = _safe_rel_path(rel_path_candidate)
+        if not safe_path:
             continue
 
-        name = item.get("name") if isinstance(item.get("name"), str) else os.path.basename(rel_path)
-        ext = item.get("extension") if isinstance(item.get("extension"), str) else ""
+        raw_name = item.get("name")
+        name = (
+            raw_name.strip()
+            if isinstance(raw_name, str) and raw_name.strip()
+            else os.path.basename(safe_path)
+        )
+        raw_ext = item.get("extension")
+        ext = raw_ext if isinstance(raw_ext, str) else ""
         ext = ext[1:] if ext.startswith(".") else ext
         ext = ext.lower()
 
         result.append(
             {
                 "name": name,
-                "path": rel_path,
+                "path": safe_path,
                 "type": _infer_gallery_type(item, ext),
                 "extension": ext,
                 "size": int(item.get("size") or 0),
                 "modified": int(item.get("modified") or 0),
-                "inline_url": f"/api/public/dl/{source_hash}/{quote(rel_path, safe='/')}?inline=true",
-                "download_url": f"/api/share/{request_hash}/file/{quote(rel_path, safe='/')}?download=1",
+                "inline_url": f"/api/public/dl/{source_hash}/{quote(safe_path, safe='/')}?inline=true",
+                "download_url": f"/api/share/{request_hash}/file/{quote(safe_path, safe='/')}?download=1",
             }
         )
 
@@ -131,21 +137,30 @@ def _build_file_share_file_list(*, request_hash: str, source_hash: str, meta: di
         A list containing a single dictionary with the file details.
     """
     raw_path = meta.get("path")
-    name = meta.get("name")
-    if not isinstance(name, str) or not name:
-        if isinstance(raw_path, str) and raw_path:
-            name = os.path.basename(raw_path)
-        else:
-            name = source_hash
+    safe_path = None
+    if isinstance(raw_path, str) and raw_path:
+        rel_path_candidate = raw_path[1:] if raw_path.startswith("/") else raw_path
+        safe_path = _safe_rel_path(rel_path_candidate)
 
-    ext = meta.get("extension") if isinstance(meta.get("extension"), str) else ""
+    raw_name = meta.get("name")
+    if isinstance(raw_name, str) and raw_name:
+        name = raw_name
+    elif safe_path:
+        name = os.path.basename(safe_path)
+    elif isinstance(raw_path, str) and raw_path:
+        name = os.path.basename(raw_path)
+    else:
+        name = source_hash
+
+    raw_ext = meta.get("extension")
+    ext = raw_ext if isinstance(raw_ext, str) else ""
     ext = ext[1:] if ext.startswith(".") else ext
     ext = ext.lower()
 
     return [
         {
             "name": name,
-            "path": name,
+            "path": safe_path or name,
             "type": _infer_gallery_type(meta, ext),
             "extension": ext,
             "size": int(meta.get("size") or 0),

@@ -1,0 +1,19 @@
+{{- if .Values.filebrowser.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "droppr.fullname" . }}-filebrowser
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "droppr.filebrowser.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.filebrowser.service.type }}
+  ports:
+  - port: {{ .Values.filebrowser.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "droppr.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: filebrowser
+{{- end }}

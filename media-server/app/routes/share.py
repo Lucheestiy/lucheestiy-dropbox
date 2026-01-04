@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 
 import requests
 from flask import Blueprint, Response, jsonify, redirect, request, stream_with_context
@@ -93,7 +94,7 @@ def create_share_blueprint(deps: dict):
             log_event("file_download", share_hash, file_path=safe)
             increment_share_alias_download_count(share_hash)
 
-        encoded = requests.utils.quote(safe, safe="/")
+        encoded = quote(safe, safe="/")
         if is_download:
             return redirect(f"/api/public/dl/{source_hash}/{encoded}?download=1", code=302)
         return redirect(f"/api/public/dl/{source_hash}/{encoded}?inline=true", code=302)

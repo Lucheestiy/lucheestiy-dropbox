@@ -276,8 +276,7 @@ export class ShareExpiration {
           // Optimistic update
           const tds = row.querySelectorAll("td");
           const originalText = tds && tds.length > 1 ? tds[1].textContent : "";
-          const optimisticExpire =
-            hours === 0 ? 0 : Math.floor(Date.now() / 1000) + hours * 3600;
+          const optimisticExpire = hours === 0 ? 0 : Math.floor(Date.now() / 1000) + hours * 3600;
           this.applyAliasToShareRow(row as HTMLElement, {
             alias_id: hash,
             target_path: path,
@@ -289,7 +288,13 @@ export class ShareExpiration {
 
           btn.disabled = true;
           try {
-            await this.updateShareExpire(hash, hours, path, limit > 0 ? limit : null, allowDownload);
+            await this.updateShareExpire(
+              hash,
+              hours,
+              path,
+              limit > 0 ? limit : null,
+              allowDownload
+            );
             // Force refresh of aliases to sync with server
             this.aliasesState.lastAppliedAt = 0;
             await this.ensureShareAliasesApplied();

@@ -235,7 +235,7 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
         if not file_name:
             return jsonify({"error": "Invalid file name"}), 400
 
-        rel_path = (
+        rel_path_raw = (
             request.form.get("relative_path")
             or request.form.get("relativePath")
             or request.form.get("relpath")
@@ -243,9 +243,7 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
             or request.headers.get("X-Upload-Path")
             or ""
         )
-        rel_path = normalize_upload_rel_path(rel_path) if rel_path else None
-        if not rel_path:
-            rel_path = normalize_upload_rel_path(file_name)
+        rel_path = normalize_upload_rel_path(rel_path_raw) or normalize_upload_rel_path(file_name)
         if not rel_path:
             return jsonify({"error": "Invalid file path"}), 400
 
@@ -376,14 +374,14 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
             or request.args.get("upload_id")
         )
 
-        rel_path = (
+        rel_path_raw = (
             request.form.get("relative_path")
             or request.form.get("relativePath")
             or request.form.get("relpath")
             or request.form.get("path")
             or ""
         )
-        rel_path = normalize_upload_rel_path(rel_path) if rel_path else None
+        rel_path = normalize_upload_rel_path(rel_path_raw)
         file_name = (
             request.headers.get("X-Upload-Name")
             or request.form.get("filename")

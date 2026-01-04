@@ -31,6 +31,8 @@ def create_analytics_blueprint(require_admin_access):
         if error_resp:
             return error_resp
         token = auth.get("token") if auth else None
+        if not isinstance(token, str) or not token:
+            return jsonify({"error": "Unauthorized"}), 401
 
         services = get_services()
         try:
@@ -60,6 +62,8 @@ def create_analytics_blueprint(require_admin_access):
         if error_resp:
             return error_resp
         token = auth.get("token") if auth else None
+        if not isinstance(token, str) or not token:
+            return jsonify({"error": "Unauthorized"}), 401
 
         include_empty = parse_bool(
             request.args.get("include_empty") or request.args.get("includeEmpty") or "true"
@@ -201,6 +205,8 @@ def create_analytics_blueprint(require_admin_access):
         if error_resp:
             return error_resp
         token = auth.get("token") if auth else None
+        if not isinstance(token, str) or not token:
+            return jsonify({"error": "Unauthorized"}), 401
 
         since, until = _get_time_range()
         cache_key = f"analytics_share:{share_hash}:{since}:{until}"
@@ -305,6 +311,8 @@ def create_analytics_blueprint(require_admin_access):
         if error_resp:
             return error_resp
         token = auth.get("token") if auth else None
+        if not isinstance(token, str) or not token:
+            return jsonify({"error": "Unauthorized"}), 401
 
         services = get_services()
         try:

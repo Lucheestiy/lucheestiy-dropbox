@@ -192,10 +192,11 @@ def _extract_ffprobe_meta(payload: dict) -> dict | None:
     if not payload or not isinstance(payload, dict):
         return None
 
-    streams = payload.get("streams")
-    if not isinstance(streams, list):
-        streams = []
-    fmt = payload.get("format") if isinstance(payload.get("format"), dict) else {}
+    streams_value = payload.get("streams")
+    streams = streams_value if isinstance(streams_value, list) else []
+
+    format_value = payload.get("format")
+    fmt = format_value if isinstance(format_value, dict) else {}
 
     video_stream = next(
         (s for s in streams if isinstance(s, dict) and s.get("codec_type") == "video"), None
@@ -304,8 +305,7 @@ def _ffprobe_video_meta(src_url: str, headers: dict | None = None) -> dict | Non
         result = subprocess.run(
             cmd,
             check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=VIDEO_META_FFPROBE_TIMEOUT_SECONDS,
         )
 

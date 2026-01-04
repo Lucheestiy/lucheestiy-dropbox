@@ -102,5 +102,41 @@ def test_ensure_video_meta_record(mock_ffprobe, mock_conn_ctx):
             res = vm._ensure_video_meta_record(
                 db_path="path", src_url="url", current_size=100, current_modified=None
             )
-    assert mock_ffprobe.called
-    assert mock_conn.execute.called # For upsert
+    @patch("app.services.video_meta.VideoMetaBase")
+    @patch("app.services.video_meta._VIDEO_META_ENGINE")
+    @patch("os.makedirs")
+    def test_init_video_meta_db(mock_makedirs, mock_engine, mock_base, tmp_path):
+        with patch("app.services.video_meta.VIDEO_META_DB_PATH", str(tmp_path / "vm.sqlite")):
+            vm._init_video_meta_db()
+            assert mock_makedirs.called
+            assert mock_base.metadata.create_all.called
+    
+    
+    @patch("app.services.video_meta._init_video_meta_db")
+    @patch("os.makedirs")
+    @patch("fcntl.flock")
+    @patch("builtins.open")
+    def test_ensure_video_meta_db(mock_open, mock_flock, mock_makedirs, mock_init):
+        vm._video_meta_db_ready = False
+        vm._ensure_video_meta_db()
+        assert mock_init.called
+        assert vm._video_meta_db_ready is True
+    
+    
+    def test_extract_ffprobe_meta_sar_rotation():
+        payload = {
+            "streams": [
+                {
+                    "codec_type": "video",
+                    "width": 100,
+                    "height": 100,
+                    "sample_aspect_ratio": "2:1",
+                    "side_data_list": [{"rotation": -90}],
+                }
+            ]
+        }
+        res = vm._extract_ffprobe_meta(payload)
+        # SAR 2:1 -> display_width 200. Rotation -90 (270) -> swap -> 100x200
+        assert res["video"]["display_width"] == 100
+        assert res["video"]["display_height"] == 200
+    

@@ -1,2 +1,57 @@
-const l="v6",a=`droppr-static-${l}`,o=["/static/gallery.min.css?v=2","/static/gallery.min.js?v=3","/static/video-player.min.css?v=1","/static/hls.min.js?v=1","/static/video-player.min.js?v=1","/static/request.js?v=2","/static/analytics.js?v=1","/static/media-viewer.js?v=1","/static/stream-gallery.js?v=3","/static/test-media.js?v=1","/static/sw-register.js?v=1","/droppr-theme.css?v=10","/droppr-panel.js?v=32"];self.addEventListener("install",s=>{s.waitUntil(caches.open(a).then(t=>t.addAll(o)).then(()=>self.skipWaiting()))});self.addEventListener("activate",s=>{s.waitUntil(caches.keys().then(t=>Promise.all(t.filter(e=>e!==a).map(e=>caches.delete(e)))).then(()=>self.clients.claim()))});self.addEventListener("fetch",s=>{const t=s.request;if(t.method!=="GET")return;const e=new URL(t.url);e.origin!==self.location.origin||!(e.pathname.startsWith("/static/")||e.pathname==="/droppr-theme.css"||e.pathname==="/droppr-panel.js")||s.respondWith(caches.match(t).then(i=>i||fetch(t).then(n=>{const c=n.clone();return caches.open(a).then(r=>r.put(t,c)),n}).catch(()=>i??new Response("Not found",{status:404}))))});
+const l = "v6",
+  a = `droppr-static-${l}`,
+  o = [
+    "/static/gallery.min.css?v=2",
+    "/static/gallery.min.js?v=3",
+    "/static/video-player.min.css?v=1",
+    "/static/hls.min.js?v=1",
+    "/static/video-player.min.js?v=1",
+    "/static/request.js?v=2",
+    "/static/analytics.js?v=1",
+    "/static/media-viewer.js?v=1",
+    "/static/stream-gallery.js?v=3",
+    "/static/test-media.js?v=1",
+    "/static/sw-register.js?v=1",
+    "/droppr-theme.css?v=10",
+    "/droppr-panel.js?v=32",
+  ];
+self.addEventListener("install", (s) => {
+  s.waitUntil(
+    caches
+      .open(a)
+      .then((t) => t.addAll(o))
+      .then(() => self.skipWaiting())
+  );
+});
+self.addEventListener("activate", (s) => {
+  s.waitUntil(
+    caches
+      .keys()
+      .then((t) => Promise.all(t.filter((e) => e !== a).map((e) => caches.delete(e))))
+      .then(() => self.clients.claim())
+  );
+});
+self.addEventListener("fetch", (s) => {
+  const t = s.request;
+  if (t.method !== "GET") return;
+  const e = new URL(t.url);
+  e.origin !== self.location.origin ||
+    !(
+      e.pathname.startsWith("/static/") ||
+      e.pathname === "/droppr-theme.css" ||
+      e.pathname === "/droppr-panel.js"
+    ) ||
+    s.respondWith(
+      caches.match(t).then(
+        (i) =>
+          i ||
+          fetch(t)
+            .then((n) => {
+              const c = n.clone();
+              return (caches.open(a).then((r) => r.put(t, c)), n);
+            })
+            .catch(() => i ?? new Response("Not found", { status: 404 }))
+      )
+    );
+});
 //# sourceMappingURL=sw.js.map
