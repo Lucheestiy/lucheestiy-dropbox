@@ -1,7 +1,7 @@
 .PHONY: test lint format coverage build restart
 
 test:
-	docker compose exec media-server pytest tests/
+	docker compose exec -e COVERAGE_FILE=/tmp/.coverage media-server pytest tests/
 
 lint:
 	docker compose exec media-server ruff check app/
@@ -12,7 +12,7 @@ format:
 	docker compose exec media-server ruff check --fix app/
 
 coverage:
-	docker compose exec -u root media-server pytest --cov=app tests/
+	docker compose exec -e COVERAGE_FILE=/tmp/.coverage media-server pytest --cov=app tests/
 
 build:
 	docker compose build

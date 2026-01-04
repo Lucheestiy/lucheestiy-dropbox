@@ -288,7 +288,13 @@ if not DROPPR_AUTH_SECRET:
     )
 
 try:
-    DROPPR_AUTH_ACCESS_TTL_SECONDS = int(os.environ.get("DROPPR_AUTH_ACCESS_TTL_SECONDS", "900"))
+    # Back-compat: older configs used DROPPR_AUTH_TOKEN_TTL_SECONDS.
+    _access_ttl_raw = (
+        os.environ.get("DROPPR_AUTH_ACCESS_TTL_SECONDS")
+        or os.environ.get("DROPPR_AUTH_TOKEN_TTL_SECONDS")
+        or "900"
+    )
+    DROPPR_AUTH_ACCESS_TTL_SECONDS = int(_access_ttl_raw)
 except (TypeError, ValueError):
     DROPPR_AUTH_ACCESS_TTL_SECONDS = 900
 DROPPR_AUTH_ACCESS_TTL_SECONDS = max(60, DROPPR_AUTH_ACCESS_TTL_SECONDS)
