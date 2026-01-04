@@ -1,3 +1,10 @@
 flask
 requests
 gunicorn
+flask-limiter
+redis
+celery
+prometheus-client
+sentry-sdk
+boto3
+SQLAlchemy

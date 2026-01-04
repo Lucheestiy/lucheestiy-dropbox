@@ -11,7 +11,7 @@ RUN apt-get update && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py /app/
+COPY app /app/app
 
 EXPOSE 5000
 

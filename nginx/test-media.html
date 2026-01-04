@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Media Test - Dropbox</title>
+    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
+    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com">
     <style>
         body { 
             font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
@@ -116,21 +118,10 @@
         </div>
     </div>
     
-    <script>
-        // Add video loading behavior
-        document.querySelectorAll('video').forEach(video => {
-            const loader = video.parentElement.querySelector('.video-loader');
-            if (loader) {
-                video.onloadstart = () => loader.style.display = 'block';
-                video.onwaiting = () => loader.style.display = 'block';
-                video.oncanplaythrough = () => loader.style.display = 'none';
-                video.onplaying = () => loader.style.display = 'none';
-                video.onerror = () => {
-                    loader.style.display = 'none';
-                    console.error('Video failed to load:', video.src);
-                };
-            }
-        });
-    </script>
+    <script defer src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js" crossorigin="anonymous"></script>
+    <script defer src="/static/config.js?v=2"></script>
+    <script defer src="/static/sentry-init.js?v=1"></script>
+    <script defer src="/static/test-media.js?v=1"></script>
+    <script defer src="/static/sw-register.js?v=1"></script>
 </body>
 </html>

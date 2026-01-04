@@ -30,7 +30,9 @@ services:
       - ./nginx/request.html:/usr/share/nginx/html/request.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
       - ./nginx/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
+      - ./nginx/static:/usr/share/nginx/html/static:ro
       - ./database/proxy-cache:/usr/share/nginx/html/proxy-cache:ro
+      - ./database/hls-cache:/usr/share/nginx/html/hls-cache:ro
     depends_on:
       - app
     networks:
@@ -51,8 +53,61 @@ services:
       - DROPPR_THUMB_MAX_CONCURRENCY=1
       - DROPPR_PROXY_CACHE_DIR=/database/proxy-cache
       - DROPPR_PROXY_MAX_CONCURRENCY=1
+      - DROPPR_HLS_CACHE_DIR=/database/hls-cache
+      - DROPPR_REDIS_URL=redis://redis:6379/0
+      - DROPPR_CELERY_BROKER_URL=redis://redis:6379/1
+      - DROPPR_CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - DROPPR_R2_ENABLED=${DROPPR_R2_ENABLED:-false}
+      - DROPPR_R2_ENDPOINT=${DROPPR_R2_ENDPOINT:-}
+      - DROPPR_R2_BUCKET=${DROPPR_R2_BUCKET:-}
+      - DROPPR_R2_ACCESS_KEY_ID=${DROPPR_R2_ACCESS_KEY_ID:-}
+      - DROPPR_R2_SECRET_ACCESS_KEY=${DROPPR_R2_SECRET_ACCESS_KEY:-}
+      - DROPPR_R2_PUBLIC_BASE_URL=${DROPPR_R2_PUBLIC_BASE_URL:-}
+      - DROPPR_R2_PREFIX=${DROPPR_R2_PREFIX:-droppr-cache}
     depends_on:
       - app
+      - redis
+    networks:
+      - default
+
+  media-worker:
+    build:
+      context: ./media-server
+    container_name: dropbox-media-worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    user: "1000:1000"
+    volumes:
+      - ./database:/database
+      - ./data:/srv
+    environment:
+      - DROPPR_CACHE_DIR=/database/thumb-cache
+      - DROPPR_THUMB_MAX_CONCURRENCY=1
+      - DROPPR_PROXY_CACHE_DIR=/database/proxy-cache
+      - DROPPR_PROXY_MAX_CONCURRENCY=1
+      - DROPPR_HLS_CACHE_DIR=/database/hls-cache
+      - DROPPR_REDIS_URL=redis://redis:6379/0
+      - DROPPR_CELERY_BROKER_URL=redis://redis:6379/1
+      - DROPPR_CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - DROPPR_R2_ENABLED=${DROPPR_R2_ENABLED:-false}
+      - DROPPR_R2_ENDPOINT=${DROPPR_R2_ENDPOINT:-}
+      - DROPPR_R2_BUCKET=${DROPPR_R2_BUCKET:-}
+      - DROPPR_R2_ACCESS_KEY_ID=${DROPPR_R2_ACCESS_KEY_ID:-}
+      - DROPPR_R2_SECRET_ACCESS_KEY=${DROPPR_R2_SECRET_ACCESS_KEY:-}
+      - DROPPR_R2_PUBLIC_BASE_URL=${DROPPR_R2_PUBLIC_BASE_URL:-}
+      - DROPPR_R2_PREFIX=${DROPPR_R2_PREFIX:-droppr-cache}
+    depends_on:
+      - redis
+    networks:
+      - default
+
+  redis:
+    image: redis:7-alpine
+    container_name: dropbox-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - ./database/redis:/data
     networks:
       - default
 

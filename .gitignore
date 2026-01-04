@@ -7,8 +7,15 @@ database/*
 data/*
 !data/.keep
 
+backups/
+
 media-server/__pycache__/
 *.pyc
+media-server/.pytest_cache/
+media-server/.coverage
 
 cloudflare/creds/*
 !cloudflare/creds/.keep
+
+nginx/node_modules/
+nginx/coverage/

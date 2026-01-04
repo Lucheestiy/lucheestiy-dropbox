@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r media-server/requirements.txt -r media-server/requirements-dev.txt
+      - name: Run backend tests
+        working-directory: media-server
+        run: pytest -q
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend dependencies
+        working-directory: nginx
+        run: npm install
+      - name: Run frontend tests
+        working-directory: nginx
+        run: npm test
+
+  security-scan:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build media-server image
+        run: docker build -t droppr-media-server:ci ./media-server
+      - name: Build app image
+        run: docker build -t droppr-app:ci ./app
+      - name: Trivy image scan (media-server)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: image
+          image-ref: droppr-media-server:ci
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Trivy image scan (app)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: image
+          image-ref: droppr-app:ci
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH

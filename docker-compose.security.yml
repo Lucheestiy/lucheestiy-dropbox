@@ -1,0 +1,32 @@
+services:
+  app:
+    networks:
+      - dropbox_private
+
+  media-server:
+    networks:
+      - dropbox_private
+
+  media-worker:
+    networks:
+      - dropbox_private
+
+  redis:
+    networks:
+      - dropbox_private
+
+  dropbox:
+    networks:
+      - dropbox_private
+      - dropbox_public
+
+  cloudflared-dropbox:
+    networks:
+      - dropbox_public
+
+networks:
+  dropbox_public:
+    name: dropbox_public
+  dropbox_private:
+    name: dropbox_private
+    internal: true
