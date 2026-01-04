@@ -1,160 +1,339 @@
 <!-- VERSION: 1.6.0 - Video buffer progress indicator -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Shared Media Gallery</title>
-    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
-    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com">
-    <link rel="prefetch" href="/stream-gallery.html">
-    <link rel="prefetch" href="/static/stream-gallery.js?v=3" as="script">
-    <link rel="stylesheet" href="/static/gallery.min.css?v=2">
-</head>
-<body>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="manifest" href="/static/manifest.json" />
+    <meta name="theme-color" content="#0061ff" />
+    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com" />
+    <link rel="prefetch" href="/stream-gallery.html" />
+    <link rel="prefetch" href="/static/stream-gallery.js?v=3" as="script" />
+    <link rel="stylesheet" href="/static/gallery.min.css?v=2" />
+  </head>
+  <body>
+    <a href="#galleryGrid" class="skip-link">Skip to content</a>
+
     <!-- Offline Banner -->
     <div id="offlineBanner" class="offline-banner">
-        <span>📡</span>
-        <span>You're offline. Some features may be unavailable.</span>
+      <span>📡</span>
+      <span>You're offline. Some features may be unavailable.</span>
     </div>
 
     <div id="pullToRefresh" class="pull-to-refresh" aria-live="polite">Pull to refresh</div>
 
     <!-- Video Stuck Overlay - Fullscreen clickable -->
     <div id="videoOverlay" class="video-overlay">
-        <div class="video-overlay-content">
-            <div class="spinner"></div>
-            <p id="overlayMessage">Video is loading...</p>
-            <p class="hint">Tap anywhere to reload video</p>
-        </div>
+      <div class="video-overlay-content">
+        <div class="spinner"></div>
+        <p id="overlayMessage">Video is loading...</p>
+        <p class="hint">Tap anywhere to reload video</p>
+      </div>
     </div>
 
     <div class="header">
-        <h1>Shared Media Gallery</h1>
-        <p>Viewing files shared via Dropbox</p>
+      <h1>Shared Media Gallery</h1>
+      <p>Viewing files shared via Dropbox</p>
 
-        <div class="controls-bar">
-            <div class="search-box">
-                <span class="search-icon" aria-hidden="true">🔍</span>
-                <input type="text" id="searchInput" placeholder="Search files..." aria-label="Search files">
-            </div>
-
-            <div class="filter-group" role="group" aria-label="Filter by media type">
-                <button class="filter-btn active" data-filter="all" aria-pressed="true">All <span class="filter-badge" id="countAll">0</span></button>
-                <button class="filter-btn" data-filter="image" aria-pressed="false">Images <span class="filter-badge" id="countImages">0</span></button>
-                <button class="filter-btn" data-filter="video" aria-pressed="false">Videos <span class="filter-badge" id="countVideos">0</span></button>
-            </div>
-
-            <select class="sort-select" id="sortSelect" aria-label="Sort files">
-                <option value="type_asc">Type (Images first)</option>
-                <option value="type_desc">Type (Videos first)</option>
-                <option value="name_asc">Name (A-Z)</option>
-                <option value="name_desc">Name (Z-A)</option>
-                <option value="size_desc">Size (Largest)</option>
-                <option value="size_asc">Size (Smallest)</option>
-            </select>
-
-            <div class="layout-toggle" id="layoutToggle" role="group" aria-label="Layout options">
-                <button id="gridViewBtn" class="active" title="Grid view" aria-label="Grid view">▦</button>
-                <button id="listViewBtn" title="List view" aria-label="List view">☰</button>
-            </div>
-
-            <button class="theme-toggle" id="themeToggle" title="Toggle dark/light theme" aria-label="Toggle theme">🌙</button>
-
-            <button class="action-btn secondary" id="detailsBtn" title="Toggle video details">ℹ Details</button>
-            <button class="action-btn secondary" id="copyLinkBtn">🔗 Share</button>
-            <button class="action-btn secondary" id="streamBtn" title="Open Stream Gallery (optimized video player)">▶ Stream</button>
-            <button class="action-btn secondary" id="refreshBtn" title="Refresh. Shift+click = hard reload">🔄 Refresh</button>
-            <a href="#" id="downloadAllBtn" class="action-btn">⬇️ Download All</a>
+      <div class="controls-bar">
+        <div class="search-box">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Search files..."
+            aria-label="Search files"
+          />
         </div>
+
+        <div class="filter-group" role="group" aria-label="Filter by media type">
+          <button class="filter-btn active" data-filter="all" aria-pressed="true">
+            All <span class="filter-badge" id="countAll">0</span>
+          </button>
+          <button class="filter-btn" data-filter="image" aria-pressed="false">
+            Images <span class="filter-badge" id="countImages">0</span>
+          </button>
+          <button class="filter-btn" data-filter="video" aria-pressed="false">
+            Videos <span class="filter-badge" id="countVideos">0</span>
+          </button>
+        </div>
+
+        <select class="sort-select" id="sortSelect" aria-label="Sort files">
+          <option value="type_asc">Type (Images first)</option>
+          <option value="type_desc">Type (Videos first)</option>
+          <option value="date_desc">Date (Newest)</option>
+          <option value="date_asc">Date (Oldest)</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="name_desc">Name (Z-A)</option>
+          <option value="size_desc">Size (Largest)</option>
+          <option value="size_asc">Size (Smallest)</option>
+        </select>
+
+        <div class="layout-toggle" id="layoutToggle" role="group" aria-label="Layout options">
+          <button id="gridViewBtn" class="active" title="Grid view" aria-label="Grid view">
+            ▦
+          </button>
+          <button id="listViewBtn" title="List view" aria-label="List view">☰</button>
+        </div>
+
+        <button
+          class="theme-toggle"
+          id="themeToggle"
+          title="Toggle dark/light theme"
+          aria-label="Toggle theme"
+        >
+          🌙
+        </button>
+
+        <button
+          class="action-btn secondary"
+          id="detailsBtn"
+          title="Toggle video details"
+          aria-label="Toggle video details"
+        >
+          ℹ Details
+        </button>
+        <button class="action-btn secondary" id="copyLinkBtn" aria-label="Copy share link">
+          🔗 Share
+        </button>
+        <button
+          class="action-btn secondary"
+          id="streamBtn"
+          title="Open Stream Gallery (optimized video player)"
+          aria-label="Open Stream Gallery"
+        >
+          ▶ Stream
+        </button>
+        <button
+          class="action-btn secondary"
+          id="refreshBtn"
+          title="Refresh. Shift+click = hard reload"
+          aria-label="Refresh gallery"
+        >
+          🔄 Refresh
+        </button>
+        <a href="#" id="downloadAllBtn" class="action-btn" aria-label="Download all files as ZIP"
+          >⬇️ Download All</a
+        >
+      </div>
     </div>
 
-    <div class="gallery-container">
-        <div id="loading" class="loading">
-            <div class="skeleton-grid">
-                <div class="skeleton-card"><div class="skeleton-preview"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
-                <div class="skeleton-card"><div class="skeleton-preview" style="height:280px"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
-                <div class="skeleton-card"><div class="skeleton-preview" style="height:160px"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
-                <div class="skeleton-card"><div class="skeleton-preview" style="height:220px"></div><div class="skeleton-info"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+    <div class="gallery-container" role="main">
+      <div id="loading" class="loading" aria-busy="true" aria-label="Loading gallery content">
+        <div class="skeleton-grid">
+          <div class="skeleton-card">
+            <div class="skeleton-preview"></div>
+            <div class="skeleton-info">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-meta"></div>
             </div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-preview" style="height: 280px"></div>
+            <div class="skeleton-info">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-meta"></div>
+            </div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-preview" style="height: 160px"></div>
+            <div class="skeleton-info">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-meta"></div>
+            </div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-preview" style="height: 220px"></div>
+            <div class="skeleton-info">
+              <div class="skeleton-title"></div>
+              <div class="skeleton-meta"></div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div id="errorState" class="error-state" style="display: none;">
-            <div class="error-icon">⚠️</div>
-            <h3 id="errorTitle">Failed to load gallery</h3>
-            <p id="errorMessage">Please check your connection and try again.</p>
-            <button class="retry-btn" onclick="location.reload()">Try Again</button>
+      <div id="errorState" class="error-state" style="display: none">
+        <div class="error-icon">⚠️</div>
+        <h3 id="errorTitle">Failed to load gallery</h3>
+        <p id="errorMessage">Please check your connection and try again.</p>
+        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem">
+          <button class="retry-btn" onclick="location.reload()">Try Again</button>
+          <button
+            class="retry-btn secondary"
+            onclick="if(confirm('This will clear browser cache and reload. Continue?')){ window.location.href = window.location.pathname + '?refresh=1&v=' + Date.now(); }"
+          >
+            Clear Cache
+          </button>
         </div>
+      </div>
 
-        <div id="galleryGrid" class="media-grid"></div>
+      <div id="galleryGrid" class="media-grid"></div>
 
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <h3 id="emptyTitle">No files found</h3>
-            <p id="emptyMessage">Try adjusting your search or filters</p>
-        </div>
+      <div id="emptyState" class="empty-state" style="display: none">
+        <h3 id="emptyTitle">No files found</h3>
+        <p id="emptyMessage">Try adjusting your search or filters</p>
+      </div>
     </div>
 
     <!-- Modal -->
-    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-label="Media viewer">
-        <div class="modal-header">
-            <div class="modal-controls">
-                <button class="icon-btn" id="zoomBtn" title="Zoom">🔍</button>
-                <button class="icon-btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
-                <button class="icon-btn" id="slideshowBtn" title="Slideshow">▶</button>
-                <button class="icon-btn" id="speedBtn" title="Playback speed" style="display:none;">1x</button>
-                <button class="icon-btn danger" id="resetVideoBtn" title="Reset video (if stuck)" style="display:none;">⟳</button>
-                <a href="#" class="icon-btn" id="downloadBtn" download title="Download">⬇</a>
-                <a href="#" class="icon-btn" id="viewOriginalBtn" target="_blank" title="View Original">↗</a>
-                <button class="icon-btn" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
+    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div class="modal-controls">
+          <button class="icon-btn" id="zoomBtn" title="Zoom" aria-label="Toggle zoom">🔍</button>
+          <button
+            class="icon-btn"
+            id="fullscreenBtn"
+            title="Fullscreen"
+            aria-label="Toggle fullscreen"
+          >
+            ⛶
+          </button>
+          <button
+            class="icon-btn"
+            id="slideshowBtn"
+            title="Slideshow"
+            aria-label="Toggle slideshow"
+          >
+            ▶
+          </button>
+          <button
+            class="icon-btn"
+            id="speedBtn"
+            title="Playback speed"
+            style="display: none"
+            aria-label="Video playback speed"
+          >
+            1x
+          </button>
+          <button
+            class="icon-btn danger"
+            id="resetVideoBtn"
+            title="Reset video (if stuck)"
+            style="display: none"
+            aria-label="Reset video"
+          >
+            ⟳
+          </button>
+          <a
+            href="#"
+            class="icon-btn"
+            id="downloadBtn"
+            download
+            title="Download"
+            aria-label="Download file"
+            >⬇</a
+          >
+          <a
+            href="#"
+            class="icon-btn"
+            id="viewOriginalBtn"
+            target="_blank"
+            title="View Original"
+            aria-label="View original file"
+            >↗</a
+          >
+          <button
+            class="icon-btn"
+            id="helpBtn"
+            title="Keyboard shortcuts (?)"
+            aria-label="Show help"
+          >
+            ?
+          </button>
+          <button
+            class="icon-btn"
+            id="commentsBtn"
+            title="Toggle comments"
+            aria-label="Toggle comments"
+          >
+            💬
+          </button>
+        </div>
+        <button class="icon-btn" id="closeBtn" title="Close" aria-label="Close viewer">×</button>
+      </div>
+
+      <button class="nav-btn nav-prev" id="prevBtn" aria-label="Previous">❮</button>
+      <button class="nav-btn nav-next" id="nextBtn" aria-label="Next">❯</button>
+
+      <div class="modal-content-wrapper">
+        <div id="modalContent" class="modal-media-container"></div>
+        <div id="commentsPane" class="comments-pane" style="display: none">
+          <div class="comments-header">
+            <h3>Comments</h3>
+            <button class="icon-btn" id="closeCommentsBtn">&times;</button>
+          </div>
+          <div id="commentsList" class="comments-list">
+            <p class="muted">Loading comments...</p>
+          </div>
+          <form id="commentForm" class="comment-form">
+            <div class="comment-input-group">
+              <input type="text" id="commentAuthor" placeholder="Your name" maxlength="50" />
+              <textarea id="commentContent" placeholder="Write a comment..." required maxlength="2000"></textarea>
             </div>
-            <button class="icon-btn" id="closeBtn" title="Close">×</button>
+            <button type="submit" class="action-btn">Post</button>
+          </form>
         </div>
+      </div>
 
-        <button class="nav-btn nav-prev" id="prevBtn" aria-label="Previous">❮</button>
-        <button class="nav-btn nav-next" id="nextBtn" aria-label="Next">❯</button>
-
-        <div class="modal-content-wrapper" id="modalContent"></div>
-
-        <div class="modal-footer">
-            <h3 id="modalTitle">Filename</h3>
-            <p id="modalMeta">Meta info</p>
-        </div>
+      <div class="modal-footer">
+        <h3 id="modalTitle">Filename</h3>
+        <p id="modalMeta">Meta info</p>
+      </div>
     </div>
 
     <!-- Toast -->
     <div id="toast" class="toast">
-        <span class="toast-icon">✓</span>
-        <span id="toastMessage">Action successful</span>
+      <span class="toast-icon">✓</span>
+      <span id="toastMessage">Action successful</span>
     </div>
 
     <button id="backToTop" class="back-to-top" title="Back to Top">↑</button>
 
     <!-- Help Overlay -->
     <div id="helpOverlay" class="help-overlay" role="dialog" aria-modal="true">
-        <div class="help-content">
-            <h2>Keyboard Shortcuts <button class="icon-btn" id="closeHelpBtn">×</button></h2>
-            <div class="help-section">
-                <h3>Navigation</h3>
-                <div class="shortcut-row"><span>Previous/Next</span><span class="shortcut-key"><kbd>←</kbd> <kbd>→</kbd></span></div>
-                <div class="shortcut-row"><span>Close viewer</span><span class="shortcut-key"><kbd>Esc</kbd></span></div>
-            </div>
-            <div class="help-section">
-                <h3>Video</h3>
-                <div class="shortcut-row"><span>Reset stuck video</span><span class="shortcut-key"><kbd>R</kbd></span></div>
-                <div class="shortcut-row"><span>Kill all connections</span><span class="shortcut-key"><kbd>K</kbd></span></div>
-            </div>
-            <div class="help-section">
-                <h3>Other</h3>
-                <div class="shortcut-row"><span>Toggle slideshow</span><span class="shortcut-key"><kbd>Space</kbd></span></div>
-                <div class="shortcut-row"><span>Show this help</span><span class="shortcut-key"><kbd>?</kbd></span></div>
-            </div>
+      <div class="help-content">
+        <h2>Keyboard Shortcuts <button class="icon-btn" id="closeHelpBtn">×</button></h2>
+        <div class="help-section">
+          <h3>Navigation</h3>
+          <div class="shortcut-row">
+            <span>Previous/Next</span><span class="shortcut-key"><kbd>←</kbd> <kbd>→</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Close viewer</span><span class="shortcut-key"><kbd>Esc</kbd></span>
+          </div>
         </div>
+        <div class="help-section">
+          <h3>Video</h3>
+          <div class="shortcut-row">
+            <span>Reset stuck video</span><span class="shortcut-key"><kbd>R</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Kill all connections</span><span class="shortcut-key"><kbd>K</kbd></span>
+          </div>
+        </div>
+        <div class="help-section">
+          <h3>Other</h3>
+          <div class="shortcut-row">
+            <span>Toggle slideshow</span><span class="shortcut-key"><kbd>Space</kbd></span>
+          </div>
+          <div class="shortcut-row">
+            <span>Show this help</span><span class="shortcut-key"><kbd>?</kbd></span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <script defer src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js" crossorigin="anonymous"></script>
+    <script
+      defer
+      src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script defer src="/static/config.js?v=2"></script>
     <script defer src="/static/sentry-init.js?v=1"></script>
     <script defer src="/static/gallery.min.js?v=3"></script>
     <script defer src="/static/sw-register.js?v=1"></script>
-</body>
+  </body>
 </html>

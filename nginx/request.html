@@ -1,426 +1,520 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dropbox File Request</title>
-  <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
-  <link rel="dns-prefetch" href="https://browser.sentry-cdn.com">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dropbox File Request</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="manifest" href="/static/manifest.json" />
+    <meta name="theme-color" content="#0061ff" />
+    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
 
-    :root {
-      --bg: #eef3fb;
-      --bg-soft: #f7faff;
-      --card: #ffffff;
-      --ink: #0f172a;
-      --muted: #51607a;
-      --accent: #0061ff;
-      --accent-dark: #0b4bd6;
-      --accent-glow: rgba(0, 97, 255, 0.24);
-      --border: #d8e2f1;
-      --shadow: 0 30px 70px -40px rgba(15, 23, 42, 0.45);
-    }
+      :root {
+        --bg: #eef3fb;
+        --bg-soft: #f7faff;
+        --card: #ffffff;
+        --ink: #0f172a;
+        --muted: #51607a;
+        --accent: #0061ff;
+        --accent-dark: #0b4bd6;
+        --accent-glow: rgba(0, 97, 255, 0.24);
+        --border: #d8e2f1;
+        --shadow: 0 30px 70px -40px rgba(15, 23, 42, 0.45);
+      }
 
-    * {
-      box-sizing: border-box;
-    }
+      * {
+        box-sizing: border-box;
+      }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 16px;
-      font-family: "Space Grotesk", "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top left, #f4f8ff 0%, var(--bg) 45%, var(--bg-soft) 100%);
-      color: var(--ink);
-      overflow-x: hidden;
-    }
+      /* Accessibility: Improved Focus Indicators */
+      :focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
 
-    .orb {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(0px);
-      opacity: 0.35;
-      z-index: 0;
-      animation: drift 16s ease-in-out infinite;
-    }
+      /* Accessibility: Reduced Motion */
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
 
-    .orb.one {
-      width: 240px;
-      height: 240px;
-      top: -60px;
-      left: -80px;
-      background: radial-gradient(circle at 30% 30%, rgba(0, 97, 255, 0.35), rgba(0, 97, 255, 0.08));
-    }
+      /* Skip to content link */
+      .skip-link {
+        position: absolute;
+        top: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--accent);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0 0 10px 10px;
+        z-index: 10000;
+        text-decoration: none;
+        font-weight: 600;
+        transition: top 0.2s;
+      }
 
-    .orb.two {
-      width: 180px;
-      height: 180px;
-      bottom: -40px;
-      right: -30px;
-      background: radial-gradient(circle at 30% 30%, rgba(14, 116, 144, 0.3), rgba(14, 116, 144, 0.06));
-      animation-delay: -6s;
-    }
+      .skip-link:focus {
+        top: 0;
+      }
 
-    @keyframes drift {
-      0%, 100% { transform: translate3d(0, 0, 0); }
-      50% { transform: translate3d(12px, -18px, 0); }
-    }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 16px;
+        font-family:
+          "Space Grotesk",
+          "IBM Plex Sans",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        background: radial-gradient(
+          circle at top left,
+          #f4f8ff 0%,
+          var(--bg) 45%,
+          var(--bg-soft) 100%
+        );
+        color: var(--ink);
+        overflow-x: hidden;
+      }
 
-    .card {
-      position: relative;
-      z-index: 1;
-      width: min(720px, 100%);
-      background: var(--card);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      border: 1px solid rgba(216, 226, 241, 0.9);
-      padding: 32px;
-      display: grid;
-      gap: 20px;
-      animation: rise 0.6s ease;
-    }
+      .orb {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(0px);
+        opacity: 0.35;
+        z-index: 0;
+        animation: drift 16s ease-in-out infinite;
+      }
 
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+      .orb.one {
+        width: 240px;
+        height: 240px;
+        top: -60px;
+        left: -80px;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(0, 97, 255, 0.35),
+          rgba(0, 97, 255, 0.08)
+        );
+      }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+      .orb.two {
+        width: 180px;
+        height: 180px;
+        bottom: -40px;
+        right: -30px;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(14, 116, 144, 0.3),
+          rgba(14, 116, 144, 0.06)
+        );
+        animation-delay: -6s;
+      }
 
-    .mark {
-      width: 42px;
-      height: 42px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, #0b5fff, #2c8cff);
-      box-shadow: 0 14px 28px -18px rgba(11, 95, 255, 0.8);
-      position: relative;
-      display: grid;
-      place-items: center;
-      color: white;
-      font-weight: 700;
-      font-size: 18px;
-      letter-spacing: -0.02em;
-    }
+      @keyframes drift {
+        0%,
+        100% {
+          transform: translate3d(0, 0, 0);
+        }
+        50% {
+          transform: translate3d(12px, -18px, 0);
+        }
+      }
 
-    .brand .meta {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+      .card {
+        position: relative;
+        z-index: 1;
+        width: min(720px, 100%);
+        background: var(--card);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(216, 226, 241, 0.9);
+        padding: 32px;
+        display: grid;
+        gap: 20px;
+        animation: rise 0.6s ease;
+      }
 
-    .brand .meta .name {
-      font-size: 18px;
-      font-weight: 700;
-    }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
 
-    .brand .meta .tag {
-      font-family: "IBM Plex Sans", system-ui, sans-serif;
-      font-size: 12px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.14em;
-    }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
 
-    h1 {
-      margin: 0;
-      font-size: clamp(26px, 3vw, 32px);
-      letter-spacing: -0.02em;
-    }
+      .mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #0b5fff, #2c8cff);
+        box-shadow: 0 14px 28px -18px rgba(11, 95, 255, 0.8);
+        position: relative;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-weight: 700;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
 
-    .subtitle {
-      margin: 6px 0 0;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.5;
-    }
+      .brand .meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
 
-    .status {
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: #f4f7ff;
-      border: 1px solid rgba(0, 97, 255, 0.12);
-      color: #29407a;
-      font-size: 13px;
-    }
+      .brand .meta .name {
+        font-size: 18px;
+        font-weight: 700;
+      }
 
-    .status.error {
-      background: #fff1f1;
-      border-color: rgba(239, 68, 68, 0.24);
-      color: #a02c2c;
-    }
+      .brand .meta .tag {
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+      }
 
-    .status.success {
-      background: #ecfdf3;
-      border-color: rgba(16, 185, 129, 0.28);
-      color: #0f6f4f;
-    }
+      h1 {
+        margin: 0;
+        font-size: clamp(26px, 3vw, 32px);
+        letter-spacing: -0.02em;
+      }
 
-    .dropzone {
-      border: 2px dashed rgba(0, 97, 255, 0.25);
-      border-radius: 20px;
-      padding: 24px;
-      background: #f8faff;
-      display: grid;
-      gap: 12px;
-      text-align: center;
-      transition: border-color 0.2s ease, background 0.2s ease;
-      cursor: pointer;
-      touch-action: manipulation;
-      min-height: 160px;
-    }
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+      }
 
-    .dropzone.drag {
-      border-color: var(--accent);
-      background: #eef4ff;
-    }
+      .status {
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: #f4f7ff;
+        border: 1px solid rgba(0, 97, 255, 0.12);
+        color: #29407a;
+        font-size: 13px;
+      }
 
-    .dropzone:active {
-      border-color: var(--accent-dark);
-      background: #eef4ff;
-    }
+      .status.error {
+        background: #fff1f1;
+        border-color: rgba(239, 68, 68, 0.24);
+        color: #a02c2c;
+      }
 
-    .dropzone h3 {
-      margin: 0;
-      font-size: 18px;
-      letter-spacing: -0.01em;
-    }
+      .status.success {
+        background: #ecfdf3;
+        border-color: rgba(16, 185, 129, 0.28);
+        color: #0f6f4f;
+      }
 
-    .dropzone p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
+      .dropzone {
+        border: 2px dashed rgba(0, 97, 255, 0.25);
+        border-radius: 20px;
+        padding: 24px;
+        background: #f8faff;
+        display: grid;
+        gap: 12px;
+        text-align: center;
+        transition:
+          border-color 0.2s ease,
+          background 0.2s ease;
+        cursor: pointer;
+        touch-action: manipulation;
+        min-height: 160px;
+      }
 
-    .dropzone .hint {
-      font-size: 12px;
-      color: #71829f;
-    }
+      .dropzone.drag {
+        border-color: var(--accent);
+        background: #eef4ff;
+      }
 
-    .controls {
-      display: grid;
-      gap: 16px;
-    }
+      .dropzone:active {
+        border-color: var(--accent-dark);
+        background: #eef4ff;
+      }
 
-    .password {
-      display: none;
-      gap: 8px;
-    }
+      .dropzone h3 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.01em;
+      }
 
-    .password.show {
-      display: grid;
-    }
+      .dropzone p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
 
-    .captcha {
-      display: none;
-      gap: 8px;
-    }
+      .dropzone .hint {
+        font-size: 12px;
+        color: #71829f;
+      }
 
-    .captcha.show {
-      display: grid;
-    }
+      .controls {
+        display: grid;
+        gap: 16px;
+      }
 
-    .captcha .hint {
-      font-size: 12px;
-      color: #71829f;
-    }
+      .password {
+        display: none;
+        gap: 8px;
+      }
 
-    label {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      color: #607191;
-      font-weight: 600;
-    }
+      .password.show {
+        display: grid;
+      }
 
-    input[type="password"] {
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      font-size: 14px;
-      font-family: "IBM Plex Sans", system-ui, sans-serif;
-      outline: none;
-    }
+      .captcha {
+        display: none;
+        gap: 8px;
+      }
 
-    input[type="password"]:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(0, 97, 255, 0.12);
-    }
+      .captcha.show {
+        display: grid;
+      }
 
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+      .captcha .hint {
+        font-size: 12px;
+        color: #71829f;
+      }
 
-    button.primary {
-      appearance: none;
-      border: none;
-      border-radius: 12px;
-      padding: 12px 20px;
-      min-height: 48px;
-      font-size: 14px;
-      font-weight: 700;
-      color: white;
-      background: linear-gradient(135deg, var(--accent), #3384ff);
-      box-shadow: 0 18px 36px -24px rgba(0, 97, 255, 0.7);
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-    }
+      label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: #607191;
+        font-weight: 600;
+      }
 
-    button.primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      box-shadow: none;
-      transform: none;
-    }
+      input[type="password"] {
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        outline: none;
+      }
 
-    button.primary:not(:disabled):hover {
-      transform: translateY(-1px);
-      box-shadow: 0 22px 40px -24px rgba(0, 97, 255, 0.8);
-    }
+      input[type="password"]:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(0, 97, 255, 0.12);
+      }
 
-    .file-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: 12px;
-    }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
 
-    .file-item {
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px 14px;
-      background: #ffffff;
-      display: grid;
-      gap: 8px;
-    }
+      button.primary {
+        appearance: none;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 20px;
+        min-height: 48px;
+        font-size: 14px;
+        font-weight: 700;
+        color: white;
+        background: linear-gradient(135deg, var(--accent), #3384ff);
+        box-shadow: 0 18px 36px -24px rgba(0, 97, 255, 0.7);
+        cursor: pointer;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease,
+          opacity 0.2s ease;
+      }
 
-    .file-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+      button.primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+      }
 
-    .file-name {
-      font-size: 14px;
-      font-weight: 600;
-    }
+      button.primary:not(:disabled):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 22px 40px -24px rgba(0, 97, 255, 0.8);
+      }
 
-    .file-size {
-      font-size: 12px;
-      color: var(--muted);
-    }
+      .file-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
 
-    .file-status {
-      font-size: 12px;
-      color: var(--muted);
-    }
+      .file-item {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 12px 14px;
+        background: #ffffff;
+        display: grid;
+        gap: 8px;
+      }
 
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      border-radius: 999px;
-      background: #eef2f9;
-      overflow: hidden;
-    }
+      .file-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
 
-    .progress-bar span {
-      display: block;
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, var(--accent), #5aa0ff);
-      transition: width 0.2s ease;
-    }
+      .file-name {
+        font-size: 14px;
+        font-weight: 600;
+      }
 
-    .footer {
-      font-size: 12px;
-      color: var(--muted);
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+      .file-size {
+        font-size: 12px;
+        color: var(--muted);
+      }
 
-    .footer strong {
-      color: var(--ink);
-    }
+      .file-status {
+        font-size: 12px;
+        color: var(--muted);
+      }
 
-    @media (max-width: 640px) {
-      .card { padding: 24px; }
-      .actions { flex-direction: column; align-items: stretch; }
-      button.primary { width: 100%; }
-      .dropzone { padding: 28px; min-height: 190px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="orb one"></div>
-  <div class="orb two"></div>
+      .progress-bar {
+        width: 100%;
+        height: 6px;
+        border-radius: 999px;
+        background: #eef2f9;
+        overflow: hidden;
+      }
 
-  <main class="card">
-    <div class="brand">
-      <div class="mark">DB</div>
-      <div class="meta">
-        <div class="name">Dropbox</div>
-        <div class="tag">File Request</div>
+      .progress-bar span {
+        display: block;
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), #5aa0ff);
+        transition: width 0.2s ease;
+      }
+
+      .footer {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .footer strong {
+        color: var(--ink);
+      }
+
+      @media (max-width: 640px) {
+        .card {
+          padding: 24px;
+        }
+        .actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        button.primary {
+          width: 100%;
+        }
+        .dropzone {
+          padding: 28px;
+          min-height: 190px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a href="#subtitle" class="skip-link">Skip to content</a>
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+
+    <main class="card">
+      <div class="brand">
+        <div class="mark">DB</div>
+        <div class="meta">
+          <div class="name">Dropbox</div>
+          <div class="tag">File Request</div>
+        </div>
       </div>
-    </div>
 
-    <div>
-      <h1>Upload your files</h1>
-      <p class="subtitle" id="subtitle">Loading request details...</p>
-    </div>
-
-    <div class="status" id="status">Preparing request...</div>
-
-    <div class="dropzone" id="dropzone">
-      <input id="file-input" type="file" multiple hidden>
-      <h3>Drag and drop files</h3>
-      <p>or click to browse from your device</p>
-      <div class="hint">Multiple files supported. Keep the tab open until upload completes.</div>
-    </div>
-
-    <div class="controls">
-      <div class="password" id="password-block">
-        <label for="password-input">Request password</label>
-        <input id="password-input" type="password" autocomplete="off" placeholder="Enter password">
+      <div>
+        <h1>Upload your files</h1>
+        <p class="subtitle" id="subtitle">Loading request details...</p>
       </div>
-      <div class="captcha" id="captcha-block">
-        <label>Verification</label>
-        <div id="captcha-widget"></div>
-        <div class="hint">Complete the verification to continue.</div>
+
+      <div class="status" id="status" aria-live="polite">Preparing request...</div>
+
+      <div class="dropzone" id="dropzone">
+        <input id="file-input" type="file" multiple hidden />
+        <h3>Drag and drop files</h3>
+        <p>or click to browse from your device</p>
+        <div class="hint">Multiple files supported. Keep the tab open until upload completes.</div>
       </div>
-      <div class="actions">
-        <button class="primary" id="upload-btn" disabled>Upload files</button>
+
+      <div class="controls">
+        <div class="password" id="password-block">
+          <label for="password-input">Request password</label>
+          <input
+            id="password-input"
+            type="password"
+            autocomplete="off"
+            placeholder="Enter password"
+          />
+        </div>
+        <div class="captcha" id="captcha-block">
+          <label>Verification</label>
+          <div id="captcha-widget"></div>
+          <div class="hint">Complete the verification to continue.</div>
+        </div>
+        <div class="actions">
+          <button class="primary" id="upload-btn" disabled>Upload files</button>
+        </div>
       </div>
-    </div>
 
-    <ul class="file-list" id="file-list"></ul>
+      <ul class="file-list" id="file-list"></ul>
 
-    <div class="footer">
-      <div><strong>Private upload</strong> - recipients cannot browse existing files.</div>
-      <div id="expires-note"></div>
-    </div>
-  </main>
+      <div class="footer">
+        <div><strong>Private upload</strong> - recipients cannot browse existing files.</div>
+        <div id="expires-note"></div>
+      </div>
+    </main>
 
-  <script defer src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js" crossorigin="anonymous"></script>
-  <script defer src="/static/config.js?v=2"></script>
-  <script defer src="/static/sentry-init.js?v=1"></script>
+    <script
+      defer
+      src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script defer src="/static/config.js?v=2"></script>
+    <script defer src="/static/sentry-init.js?v=1"></script>
     <script defer src="/static/request.js?v=2"></script>
     <script defer src="/static/sw-register.js?v=1"></script>
-</body>
+  </body>
 </html>

@@ -1,0 +1,450 @@
+openapi: 3.0.3
+info:
+  title: Dropbox Media Server API
+  description: API for shared media gallery, public file requests, and administration.
+  version: 1.6.0
+servers:
+  - url: /
+paths:
+  # Public Share Listing
+  /api/share/{hash}/files:
+    get:
+      summary: List files in a public share
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - name: recursive
+          in: query
+          schema:
+            type: string
+            enum: ["0", "1"]
+      responses:
+        "200":
+          description: A list of files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GalleryFile"
+
+  # Public Share Download
+  /api/share/{hash}/file/{path}:
+    get:
+      summary: Get a file from a public share (redirects)
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+        - name: download
+          in: query
+          schema:
+            type: string
+            enum: ["1"]
+        - name: inline
+          in: query
+          schema:
+            type: string
+            enum: ["true"]
+      responses:
+        "302":
+          description: Redirect to FileBrowser download URL
+
+  /api/share/{hash}/download:
+    get:
+      summary: Download all files in a share as a ZIP
+      parameters:
+        - $ref: "#/components/parameters/hash"
+      responses:
+        "200":
+          description: ZIP file stream
+
+  # Public Media Utilities
+  /api/share/{hash}/preview/{path}:
+    get:
+      summary: Get a thumbnail preview for a file
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+        - name: w
+          in: query
+          description: Width in pixels
+          schema:
+            type: integer
+        - name: t
+          in: query
+          description: Time offset for video thumbnail (seconds)
+          schema:
+            type: number
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [jpg, webp, avif, auto]
+      responses:
+        "200":
+          description: Image data
+          content:
+            image/jpeg: {}
+            image/webp: {}
+
+  /api/share/{hash}/thumbnails/{path}:
+    get:
+      summary: Get a list of thumbnail URLs for a video
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+        - name: count
+          in: query
+          schema:
+            type: integer
+        - name: times
+          in: query
+          description: Comma-separated timestamps
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of thumbnail URLs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  duration: { type: number }
+                  thumbnails:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        time: { type: number }
+                        url: { type: string }
+
+  /api/share/{hash}/proxy/{path}:
+    get:
+      summary: Get an optimized MP4 proxy for a video (redirects)
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+      responses:
+        "302":
+          description: Redirect to proxy-cache URL
+
+  /api/share/{hash}/hls/{path}:
+    get:
+      summary: Get an adaptive HLS stream for a video (redirects)
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+      responses:
+        "302":
+          description: Redirect to master.m3u8 in hls-cache
+
+  /api/share/{hash}/video-sources/{path}:
+    get:
+      summary: Get available video sources and formats
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+        - name: prepare
+          in: query
+          description: Comma-separated targets to start preparing (fast, hd, hls)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Video source details
+    post:
+      summary: Trigger video preparation
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prepare: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: Preparation started
+
+  /api/share/{hash}/video-meta/{path}:
+    get:
+      summary: Get detailed video metadata (ffprobe)
+      parameters:
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/path"
+      responses:
+        "200":
+          description: Video metadata details
+
+  # Administration Authentication
+  /api/droppr/auth/login:
+    post:
+      summary: Login to administration (exchange FileBrowser token)
+      security:
+        - XAuth: []
+      parameters:
+        - name: X-Droppr-OTP
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: JWT tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthTokens"
+
+  /api/droppr/auth/refresh:
+    post:
+      summary: Refresh access token
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: New JWT tokens
+
+  /api/droppr/auth/logout:
+    post:
+      summary: Revoke current session
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Logged out
+
+  # Share Management
+  /api/droppr/shares/aliases:
+    get:
+      summary: List custom share aliases
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of aliases
+
+  /api/droppr/shares/{hash}/expire:
+    post:
+      summary: Update share expiration
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/hash"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hours: { type: integer }
+                path: { type: string }
+      responses:
+        "200":
+          description: Expiration updated
+
+  # Admin Media Management
+  /api/droppr/video-meta:
+    get:
+      summary: Get video metadata by filesystem path
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Video metadata
+
+  /api/droppr/preview:
+    get:
+      summary: Get file preview by filesystem path
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Image data
+
+  # File Requests
+  /api/droppr/requests:
+    post:
+      summary: Create a new file request link
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path: { type: string }
+                expires_hours: { type: integer }
+                password: { type: string }
+      responses:
+        "200":
+          description: Request link created
+
+  /api/droppr/requests/{hash}:
+    get:
+      summary: Get info about a file request
+      parameters:
+        - $ref: "#/components/parameters/hash"
+      responses:
+        "200":
+          description: Request details
+
+  /api/droppr/requests/{hash}/upload:
+    post:
+      summary: Upload a file to a request
+      parameters:
+        - $ref: "#/components/parameters/hash"
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                password: { type: string }
+      responses:
+        "200":
+          description: File uploaded
+
+  # User Management
+  /api/droppr/users:
+    get:
+      summary: Get user creation configuration
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Config details
+    post:
+      summary: Create a scoped upload user
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: User created
+
+  # Analytics
+  /api/analytics/config:
+    get:
+      summary: Get analytics system configuration
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Config details
+
+  /api/analytics/shares:
+    get:
+      summary: Get summary stats for all shares
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: include_empty
+          in: query
+          schema: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Analytics data
+
+  /api/analytics/shares/{hash}:
+    get:
+      summary: Get detailed stats for a specific share
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/hash"
+      responses:
+        "200":
+          description: Detailed stats
+
+  /api/analytics/shares/{hash}/export.csv:
+    get:
+      summary: Export share event log as CSV
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/hash"
+      responses:
+        "200":
+          description: CSV file
+
+  # System
+  /health:
+    get:
+      summary: System health check
+      responses:
+        "200":
+          description: OK
+  /version:
+    get:
+      summary: Get system version
+      responses:
+        "200":
+          description: Version string
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: Metrics data
+
+components:
+  parameters:
+    hash:
+      name: hash
+      in: path
+      required: true
+      schema: { type: string }
+    path:
+      name: path
+      in: path
+      required: true
+      schema: { type: string }
+
+  securitySchemes:
+    XAuth:
+      type: apiKey
+      in: header
+      name: X-Auth
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    GalleryFile:
+      type: object
+      properties:
+        name: { type: string }
+        path: { type: string }
+        type: { type: string, enum: [image, video, file] }
+        size: { type: integer }
+        extension: { type: string }
+        inline_url: { type: string }
+        download_url: { type: string }
+    AuthTokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from prometheus_client import CollectorRegistry, REGISTRY, multiprocess
+from prometheus_client import REGISTRY, CollectorRegistry, multiprocess
 
 from ..config import parse_bool
 

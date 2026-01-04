@@ -15,7 +15,9 @@ INTERNAL_SIGNING_HEADER = (
 INTERNAL_SIGNING_TS_HEADER = (
     os.environ.get("DROPPR_INTERNAL_SIGNING_TIMESTAMP_HEADER") or "X-Droppr-Timestamp"
 ).strip()
-INTERNAL_SIGNING_INCLUDE_QUERY = parse_bool(os.environ.get("DROPPR_INTERNAL_SIGNING_INCLUDE_QUERY", "true"))
+INTERNAL_SIGNING_INCLUDE_QUERY = parse_bool(
+    os.environ.get("DROPPR_INTERNAL_SIGNING_INCLUDE_QUERY", "true")
+)
 
 
 def _build_internal_signature(method: str, url: str) -> tuple[str, str] | None:

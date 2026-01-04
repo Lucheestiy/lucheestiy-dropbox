@@ -11,8 +11,10 @@ def _table_exists(conn, name):
 
 
 def test_analytics_db_bootstrap(app_module):
-    app_module._ensure_analytics_db()
-    conn = sqlite3.connect(app_module.ANALYTICS_DB_PATH)
+    import app.services.analytics as analytics_service
+    from app.models import ANALYTICS_DB_PATH
+    analytics_service._ensure_analytics_db()
+    conn = sqlite3.connect(ANALYTICS_DB_PATH)
     try:
         assert _table_exists(conn, "download_events")
         assert _table_exists(conn, "auth_events")
@@ -21,11 +23,12 @@ def test_analytics_db_bootstrap(app_module):
 
 
 def test_aliases_flow(app_module):
-    app_module._ensure_aliases_db()
-    app_module._upsert_share_alias(from_hash="alpha", to_hash="beta", path="/x", target_expire=None)
+    import app.services.aliases as aliases_service
+    aliases_service._ensure_aliases_db()
+    aliases_service._upsert_share_alias(from_hash="alpha", to_hash="beta", path="/x", target_expire=None)
     resolved = app_module._resolve_share_hash("alpha")
     assert resolved == "beta"
-    aliases = app_module._list_share_aliases(limit=5)
+    aliases = aliases_service._list_share_aliases(limit=5)
     assert any(item["from_hash"] == "alpha" for item in aliases)
 
 

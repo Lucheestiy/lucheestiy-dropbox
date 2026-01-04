@@ -16,6 +16,7 @@ from botocore.exceptions import ClientError
 from flask import Response, redirect
 
 from ..config import parse_bool
+from ..metrics import VIDEO_TRANSCODE_COUNT, VIDEO_TRANSCODE_LATENCY
 from .filebrowser import FILEBROWSER_PUBLIC_DL_API
 from .video_meta import _ffprobe_video_meta
 
@@ -30,7 +31,7 @@ THUMB_WEBP_QUALITY = int(os.environ.get("DROPPR_THUMB_WEBP_QUALITY", "80"))
 THUMB_ALLOW_WEBP = parse_bool(os.environ.get("DROPPR_THUMB_ALLOW_WEBP", "true"))
 THUMB_ALLOW_AVIF = parse_bool(os.environ.get("DROPPR_THUMB_ALLOW_AVIF", "false"))
 THUMB_AVIF_CRF = int(os.environ.get("DROPPR_THUMB_AVIF_CRF", "35"))
-THUMB_ALLOWED_WIDTHS_SPEC = os.environ.get("DROPPR_THUMB_ALLOWED_WIDTHS", "240,320,480,640,800")
+THUMB_ALLOWED_WIDTHS_SPEC = os.environ.get("DROPPR_THUMB_ALLOWED_WIDTHS", "32,240,320,480,640,800")
 THUMB_FFMPEG_TIMEOUT_SECONDS = int(os.environ.get("DROPPR_THUMB_FFMPEG_TIMEOUT_SECONDS", "25"))
 THUMB_MAX_CONCURRENCY = int(os.environ.get("DROPPR_THUMB_MAX_CONCURRENCY", "2"))
 _thumb_sema = threading.BoundedSemaphore(max(1, THUMB_MAX_CONCURRENCY))
@@ -143,7 +144,9 @@ R2_REGION = (os.environ.get("DROPPR_R2_REGION") or "auto").strip() or "auto"
 R2_PUBLIC_BASE_URL = (os.environ.get("DROPPR_R2_PUBLIC_BASE_URL") or "").strip().rstrip("/")
 R2_PREFIX = (os.environ.get("DROPPR_R2_PREFIX") or "droppr-cache").strip().strip("/")
 R2_ENABLED_FLAG = parse_bool(os.environ.get("DROPPR_R2_ENABLED", "true"))
-R2_ENABLED = R2_ENABLED_FLAG and bool(R2_BUCKET and R2_ENDPOINT and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY)
+R2_ENABLED = R2_ENABLED_FLAG and bool(
+    R2_BUCKET and R2_ENDPOINT and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY
+)
 R2_UPLOAD_ENABLED = parse_bool(os.environ.get("DROPPR_R2_UPLOAD_ENABLED", "true"))
 R2_REDIRECT_ENABLED = parse_bool(os.environ.get("DROPPR_R2_REDIRECT_ENABLED", "true"))
 R2_PRESIGN_TTL_SECONDS = int(os.environ.get("DROPPR_R2_PRESIGN_TTL_SECONDS", "3600"))
@@ -183,7 +186,15 @@ def _normalize_preview_format(value: str | None) -> str:
     return "auto"
 
 
-def _select_preview_format(raw_value: str | None, accept_header: str | None) -> tuple[str, str, bool]:
+def _select_preview_format(
+    raw_value: str | None, accept_header: str | None
+) -> tuple[str, str, bool]:
+    """
+    Selects the best preview format based on user preference and browser support (Accept header).
+
+    Returns:
+        A tuple of (format, mimetype, vary_accept_header).
+    """
     fmt = _normalize_preview_format(raw_value)
     if fmt == "auto":
         accept = (accept_header or "").lower()
@@ -208,6 +219,7 @@ def _select_preview_format(raw_value: str | None, accept_header: str | None) -> 
 
 
 def _preview_fallbacks(fmt: str) -> list[str]:
+    """Returns fallback formats for a given preview format."""
     if fmt == "avif":
         return ["webp", "jpg"] if THUMB_ALLOW_WEBP else ["jpg"]
     if fmt == "webp":
@@ -216,6 +228,7 @@ def _preview_fallbacks(fmt: str) -> list[str]:
 
 
 def _preview_mimetype(fmt: str) -> str:
+    """Returns the MIME type for a given preview format."""
     if fmt == "avif":
         return "image/avif"
     if fmt == "webp":
@@ -224,6 +237,9 @@ def _preview_mimetype(fmt: str) -> str:
 
 
 def _normalize_thumb_width(value: str | None) -> int:
+    """
+    Normalizes the requested thumbnail width to the closest allowed width.
+    """
     if value is None:
         return THUMB_MAX_WIDTH
     raw = str(value).strip()
@@ -257,7 +273,9 @@ def _r2_client():
         aws_access_key_id=R2_ACCESS_KEY_ID,
         aws_secret_access_key=R2_SECRET_ACCESS_KEY,
         region_name=R2_REGION,
-        config=BotoConfig(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}),
+        config=BotoConfig(
+            signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}
+        ),
     )
     return _r2_client_instance
 
@@ -302,6 +320,7 @@ def _r2_cache_set(key: str, exists: bool) -> None:
 
 
 def _r2_object_exists(key: str) -> bool:
+    """Checks if an object exists in the R2 bucket, with local caching."""
     if not R2_ENABLED:
         return False
     cached = _r2_cache_get(key)
@@ -323,6 +342,7 @@ def _r2_object_exists(key: str) -> bool:
 
 
 def _r2_object_url(key: str, *, require_public: bool) -> str | None:
+    """Returns a public URL or a presigned URL for an R2 object."""
     if not R2_ENABLED or not R2_REDIRECT_ENABLED:
         return None
     if require_public and not R2_PUBLIC_BASE_URL:
@@ -343,6 +363,7 @@ def _r2_object_url(key: str, *, require_public: bool) -> str | None:
 
 
 def _r2_upload_file(local_path: str, key: str, content_type: str | None) -> bool:
+    """Uploads a local file to the R2 bucket."""
     if not R2_ENABLED or not R2_UPLOAD_ENABLED:
         return False
     if _r2_object_exists(key):
@@ -415,16 +436,22 @@ def _r2_available_url(key: str, *, require_public: bool) -> str | None:
     return url
 
 
-def _enqueue_r2_upload_file(task_id: str, local_path: str, key: str, content_type: str | None) -> bool:
+def _enqueue_r2_upload_file(
+    task_id: str, local_path: str, key: str, content_type: str | None
+) -> bool:
     if not R2_ENABLED or not R2_UPLOAD_ENABLED or _enqueue_task_fn is None:
         return False
-    return _enqueue_task_fn(task_id, "droppr.r2_upload_file", _r2_upload_file, local_path, key, content_type)
+    return _enqueue_task_fn(
+        task_id, "droppr.r2_upload_file", _r2_upload_file, local_path, key, content_type
+    )
 
 
 def _enqueue_r2_upload_hls(task_id: str, cache_key: str, output_dir: str) -> bool:
     if not R2_ENABLED or not R2_UPLOAD_ENABLED or _enqueue_task_fn is None:
         return False
-    return _enqueue_task_fn(task_id, "droppr.r2_upload_hls", _r2_upload_hls_package, cache_key, output_dir)
+    return _enqueue_task_fn(
+        task_id, "droppr.r2_upload_hls", _r2_upload_hls_package, cache_key, output_dir
+    )
 
 
 def _get_cache_path(share_hash: str, filename: str, ext: str = "jpg") -> str:
@@ -434,7 +461,9 @@ def _get_cache_path(share_hash: str, filename: str, ext: str = "jpg") -> str:
     return os.path.join(CACHE_DIR, f"{hashed_name}.{safe_ext}")
 
 
-def _get_files_cache_path(path: str, size: int | None, modified: str | None, ext: str = "jpg") -> str:
+def _get_files_cache_path(
+    path: str, size: int | None, modified: str | None, ext: str = "jpg"
+) -> str:
     cache_key = f"{path}|{size or ''}|{modified or ''}"
     return _get_cache_path("__files__", cache_key, ext=ext)
 
@@ -511,7 +540,9 @@ def _ffmpeg_thumbnail_cmd(
     return cmd
 
 
-def _proxy_cache_key(*, share_hash: str, file_path: str, size: int, modified: str | None = None) -> str:
+def _proxy_cache_key(
+    *, share_hash: str, file_path: str, size: int, modified: str | None = None
+) -> str:
     # Cache key is stable across requests and invalidates when the source changes or encoding profile changes.
     mod = (modified or "").strip()
     key = (
@@ -521,15 +552,21 @@ def _proxy_cache_key(*, share_hash: str, file_path: str, size: int, modified: st
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def _hd_cache_key(*, share_hash: str, file_path: str, size: int, modified: str | None = None) -> str:
+def _hd_cache_key(
+    *, share_hash: str, file_path: str, size: int, modified: str | None = None
+) -> str:
     mod = (modified or "").strip()
     key = f"hd:{HD_PROFILE_VERSION}:{HD_MAX_DIMENSION}:{HD_CRF}:{HD_H264_PRESET}:{share_hash}:{file_path}:{size}:{mod}"
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def _hls_cache_key(*, share_hash: str, file_path: str, size: int, modified: str | None = None) -> str:
+def _hls_cache_key(
+    *, share_hash: str, file_path: str, size: int, modified: str | None = None
+) -> str:
     mod = (modified or "").strip()
-    rendition_key = ";".join(f"{r['height']}:{r['video_kbps']}:{r['audio_kbps']}" for r in HLS_RENDITIONS)
+    rendition_key = ";".join(
+        f"{r['height']}:{r['video_kbps']}:{r['audio_kbps']}" for r in HLS_RENDITIONS
+    )
     key = (
         f"hls:{HLS_PROFILE_VERSION}:{HLS_SEGMENT_SECONDS}:{HLS_H264_PRESET}:{HLS_CRF}:{rendition_key}:"
         f"{share_hash}:{file_path}:{size}:{mod}"
@@ -618,9 +655,7 @@ def _write_hls_master(master_path: str, renditions: list[dict]) -> None:
 
 def _ffmpeg_proxy_cmd(*, src_url: str, dst_path: str) -> list[str]:
     # Cap the longer side to PROXY_MAX_DIMENSION while preserving aspect ratio.
-    scale = (
-        f"scale='if(gt(iw,ih),min({PROXY_MAX_DIMENSION},iw),-2)':'if(gt(iw,ih),-2,min({PROXY_MAX_DIMENSION},ih))'"
-    )
+    scale = f"scale='if(gt(iw,ih),min({PROXY_MAX_DIMENSION},iw),-2)':'if(gt(iw,ih),-2,min({PROXY_MAX_DIMENSION},ih))'"
     return [
         "ffmpeg",
         "-hide_banner",
@@ -672,11 +707,19 @@ def _ensure_fast_proxy_mp4(
     size: int,
     modified: str | None = None,
 ) -> tuple[str, str, str, int | None]:
-    cache_key = _proxy_cache_key(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
+    """
+    Ensures that a fast-start H.264 proxy MP4 exists for the given video file.
+    If not, it triggers synchronous or asynchronous generation.
+    """
+    cache_key = _proxy_cache_key(
+        share_hash=share_hash, file_path=file_path, size=size, modified=modified
+    )
     output_path = os.path.join(PROXY_CACHE_DIR, f"{cache_key}.mp4")
     public_url = f"/api/proxy-cache/{cache_key}.mp4"
 
     if os.path.exists(output_path):
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("fast", "hit").inc()
         _enqueue_r2_upload_file(
             f"r2:hd:{cache_key}",
             output_path,
@@ -692,36 +735,59 @@ def _ensure_fast_proxy_mp4(
         if os.path.exists(output_path):
             return cache_key, output_path, public_url, os.path.getsize(output_path)
 
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("fast", "miss").inc()
+
         tmp_path = output_path + ".tmp"
         try:
             os.remove(tmp_path)
         except FileNotFoundError:
             pass
 
-        src_url = f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(file_path, safe='/')}?inline=true"
+        src_url = (
+            f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(file_path, safe='/')}?inline=true"
+        )
 
-        with _proxy_sema:
-            cmd = _ffmpeg_proxy_cmd(src_url=src_url, dst_path=tmp_path)
-            result = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=PROXY_FFMPEG_TIMEOUT_SECONDS,
-            )
+        start_time = time.perf_counter()
+        try:
+            with _proxy_sema:
+                cmd = _ffmpeg_proxy_cmd(src_url=src_url, dst_path=tmp_path)
+                result = subprocess.run(
+                    cmd,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=PROXY_FFMPEG_TIMEOUT_SECONDS,
+                )
 
-        if result.returncode != 0:
-            logger.error(
-                "ffmpeg proxy failed for %s: %s",
-                file_path,
-                result.stderr.decode(errors="replace"),
-            )
+            if result.returncode != 0:
+                if VIDEO_TRANSCODE_COUNT:
+                    VIDEO_TRANSCODE_COUNT.labels("fast", "error").inc()
+                logger.error(
+                    "ffmpeg proxy failed for %s: %s",
+                    file_path,
+                    result.stderr.decode(errors="replace"),
+                )
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                raise RuntimeError("Proxy generation failed")
+
+            if VIDEO_TRANSCODE_LATENCY:
+                VIDEO_TRANSCODE_LATENCY.labels("fast").observe(time.perf_counter() - start_time)
+            if VIDEO_TRANSCODE_COUNT:
+                VIDEO_TRANSCODE_COUNT.labels("fast", "success").inc()
+
+            os.replace(tmp_path, output_path)
+        except Exception as e:
+            if not isinstance(e, RuntimeError):
+                logger.error("ffmpeg proxy exception for %s: %s", file_path, e)
             try:
                 os.remove(tmp_path)
             except OSError:
                 pass
-            raise RuntimeError("Proxy generation failed")
-
-        os.replace(tmp_path, output_path)
+            raise
         _enqueue_r2_upload_file(
             f"r2:proxy:{cache_key}",
             output_path,
@@ -732,6 +798,7 @@ def _ensure_fast_proxy_mp4(
 
 
 def _ffmpeg_hd_remux_cmd(*, src_url: str, dst_path: str) -> list[str]:
+    """Returns a command to remux a video to MP4 without transcoding if possible."""
     return [
         "ffmpeg",
         "-hide_banner",
@@ -803,9 +870,7 @@ def _ffmpeg_hd_transcode_cmd(*, src_url: str, dst_path: str) -> list[str]:
     ]
 
     if HD_MAX_DIMENSION and HD_MAX_DIMENSION > 0:
-        scale = (
-            f"scale='if(gt(iw,ih),min({HD_MAX_DIMENSION},iw),-2)':'if(gt(iw,ih),-2,min({HD_MAX_DIMENSION},ih))'"
-        )
+        scale = f"scale='if(gt(iw,ih),min({HD_MAX_DIMENSION},iw),-2)':'if(gt(iw,ih),-2,min({HD_MAX_DIMENSION},ih))'"
         cmd += ["-vf", scale]
 
     cmd += [
@@ -845,11 +910,19 @@ def _ensure_hd_mp4(
     size: int,
     modified: str | None = None,
 ) -> tuple[str, str, str, int | None]:
-    cache_key = _hd_cache_key(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
+    """
+    Ensures that an HD (High Definition) MP4 exists for the given video file.
+    Tries remuxing, then copying video, then full transcode as fallbacks.
+    """
+    cache_key = _hd_cache_key(
+        share_hash=share_hash, file_path=file_path, size=size, modified=modified
+    )
     output_path = os.path.join(PROXY_CACHE_DIR, f"{cache_key}.mp4")
     public_url = f"/api/proxy-cache/{cache_key}.mp4"
 
     if os.path.exists(output_path):
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("hd", "hit").inc()
         _enqueue_r2_upload_file(
             f"r2:proxy:{cache_key}",
             output_path,
@@ -865,13 +938,18 @@ def _ensure_hd_mp4(
         if os.path.exists(output_path):
             return cache_key, output_path, public_url, os.path.getsize(output_path)
 
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("hd", "miss").inc()
+
         tmp_path = output_path + ".tmp"
         try:
             os.remove(tmp_path)
         except FileNotFoundError:
             pass
 
-        src_url = f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(file_path, safe='/')}?inline=true"
+        src_url = (
+            f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(file_path, safe='/')}?inline=true"
+        )
 
         attempts = [
             ("remux", _ffmpeg_hd_remux_cmd(src_url=src_url, dst_path=tmp_path)),
@@ -880,11 +958,13 @@ def _ensure_hd_mp4(
         ]
 
         last_err = None
+        start_time = time.perf_counter()
         with _hd_sema:
             for label, cmd in attempts:
                 try:
                     result = subprocess.run(
                         cmd,
+                        check=False,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         timeout=HD_FFMPEG_TIMEOUT_SECONDS,
@@ -894,6 +974,12 @@ def _ensure_hd_mp4(
                     continue
 
                 if result.returncode == 0:
+                    if VIDEO_TRANSCODE_LATENCY:
+                        VIDEO_TRANSCODE_LATENCY.labels("hd").observe(
+                            time.perf_counter() - start_time
+                        )
+                    if VIDEO_TRANSCODE_COUNT:
+                        VIDEO_TRANSCODE_COUNT.labels("hd", "success").inc()
                     os.replace(tmp_path, output_path)
                     _enqueue_r2_upload_file(
                         f"r2:hd:{cache_key}",
@@ -909,6 +995,8 @@ def _ensure_hd_mp4(
                 except OSError:
                     pass
 
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("hd", "error").inc()
         if last_err:
             logger.error("ffmpeg hd failed for %s: %s", file_path, last_err)
         raise RuntimeError("HD generation failed")
@@ -921,12 +1009,20 @@ def _ensure_hls_package(
     size: int,
     modified: str | None = None,
 ) -> tuple[str, str, str]:
-    cache_key = _hls_cache_key(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
+    """
+    Ensures that an adaptive HLS package exists for the given video file.
+    Generates multiple renditions as defined in HLS_RENDITIONS.
+    """
+    cache_key = _hls_cache_key(
+        share_hash=share_hash, file_path=file_path, size=size, modified=modified
+    )
     output_dir = os.path.join(HLS_CACHE_DIR, cache_key)
     master_path = os.path.join(output_dir, "master.m3u8")
     public_url = f"/api/hls-cache/{cache_key}/master.m3u8"
 
     if os.path.exists(master_path):
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("hls", "hit").inc()
         _enqueue_r2_upload_hls(f"r2:hls:{cache_key}", cache_key, output_dir)
         return cache_key, output_dir, public_url
 
@@ -937,11 +1033,16 @@ def _ensure_hls_package(
         if os.path.exists(master_path):
             return cache_key, output_dir, public_url
 
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("hls", "miss").inc()
+
         tmp_dir = output_dir + ".tmp"
         shutil.rmtree(tmp_dir, ignore_errors=True)
         os.makedirs(tmp_dir, exist_ok=True)
 
-        src_url = f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(file_path, safe='/')}?inline=true"
+        src_url = (
+            f"{FILEBROWSER_PUBLIC_DL_API}/{share_hash}/{quote(file_path, safe='/')}?inline=true"
+        )
         fps = None
         try:
             meta = _ffprobe_video_meta(src_url)
@@ -953,6 +1054,7 @@ def _ensure_hls_package(
             logger.warning("ffprobe failed for HLS %s: %s", file_path, exc)
 
         renditions = []
+        start_time = time.perf_counter()
         with _hls_sema:
             for rendition in HLS_RENDITIONS:
                 dir_name = f"v{rendition['height']}"
@@ -968,16 +1070,24 @@ def _ensure_hls_package(
                 )
                 result = subprocess.run(
                     cmd,
+                    check=False,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     timeout=HLS_FFMPEG_TIMEOUT_SECONDS,
                 )
                 if result.returncode != 0:
+                    if VIDEO_TRANSCODE_COUNT:
+                        VIDEO_TRANSCODE_COUNT.labels("hls", "error").inc()
                     err = result.stderr.decode(errors="replace")
                     shutil.rmtree(tmp_dir, ignore_errors=True)
                     logger.error("ffmpeg HLS failed for %s: %s", file_path, err)
                     raise RuntimeError("HLS generation failed")
                 renditions.append({**rendition, "dir_name": dir_name})
+
+        if VIDEO_TRANSCODE_LATENCY:
+            VIDEO_TRANSCODE_LATENCY.labels("hls").observe(time.perf_counter() - start_time)
+        if VIDEO_TRANSCODE_COUNT:
+            VIDEO_TRANSCODE_COUNT.labels("hls", "success").inc()
 
         _write_hls_master(os.path.join(tmp_dir, "master.m3u8"), renditions)
 

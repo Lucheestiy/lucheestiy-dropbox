@@ -4,10 +4,15 @@ interface FileEntry {
   name: string;
   size: number;
   relPath: string;
-  status: 'queued' | 'uploading' | 'done' | 'error';
+  status: "queued" | "uploading" | "done" | "error";
   progress: number;
   el: HTMLElement | null;
   uploadId?: string;
+  startTime?: number;
+  lastLoaded?: number;
+  lastTime?: number;
+  speed?: number;
+  eta?: number;
 }
 
 interface RequestMetaResponse {
@@ -65,7 +70,7 @@ interface UploadResponse {
 
   function setStatus(text: string, tone?: string): void {
     statusEl.textContent = text || "";
-    statusEl.className = "status" + (tone ? (" " + tone) : "");
+    statusEl.className = "status" + (tone ? " " + tone : "");
   }
 
   function formatBytes(bytes: number | null | undefined): string {
@@ -91,7 +96,12 @@ interface UploadResponse {
   function normalizeExtensions(list: string[] | null | undefined): string[] {
     if (!list || !list.length) return [];
     return list
-      .map((ext: string) => String(ext || "").trim().replace(/^\./, "").toLowerCase())
+      .map((ext: string) =>
+        String(ext || "")
+          .trim()
+          .replace(/^\./, "")
+          .toLowerCase()
+      )
       .filter((ext: string) => ext);
   }
 
@@ -111,13 +121,14 @@ interface UploadResponse {
 
   function sanitizeRelPath(value: string | null | undefined): string {
     if (!value) return "";
-    let cleaned = String(value || "").replace(/\\/g, "/");
+    const cleaned = String(value || "").replace(/\\/g, "/");
     if (cleaned.charAt(0) === "/") return "";
     const parts = cleaned.split("/").filter((part: string) => part);
     if (!parts.length) return "";
     for (let i = 0; i < parts.length; i += 1) {
       const part = parts[i];
       if (part === "." || part === "..") return "";
+      // eslint-disable-next-line no-control-regex
       if (/[\x00-\x1f\x7f]/.test(part)) return "";
     }
     return parts.join("/");
@@ -133,7 +144,7 @@ interface UploadResponse {
     if (maxFileSize) {
       extras.push("Max size: " + formatBytes(maxFileSize) + ".");
     }
-    dropzoneHint.textContent = extras.length ? (base + " " + extras.join(" ")) : base;
+    dropzoneHint.textContent = extras.length ? base + " " + extras.join(" ") : base;
   }
 
   function updateFileInputAccept(): void {
@@ -151,13 +162,13 @@ interface UploadResponse {
     li.className = "file-item";
     li.innerHTML =
       '<div class="file-row">' +
-        '<div class="file-name"></div>' +
-        '<div class="file-size"></div>' +
-      '</div>' +
+      '<div class="file-name"></div>' +
+      '<div class="file-size"></div>' +
+      "</div>" +
       '<div class="file-row">' +
-        '<div class="file-status"></div>' +
-        '<div class="file-progress"></div>' +
-      '</div>' +
+      '<div class="file-status"></div>' +
+      '<div class="file-progress"></div>' +
+      "</div>" +
       '<div class="progress-bar"><span></span></div>';
 
     (li.querySelector(".file-name") as HTMLElement).textContent = entry.name;
@@ -170,10 +181,30 @@ interface UploadResponse {
   function updateRow(entry: FileEntry): void {
     if (!entry.el) return;
     const status = entry.status || "queued";
-    const statusLabel = status === "uploading" ? "Uploading" : (status === "done" ? "Complete" : (status === "error" ? "Failed" : "Queued"));
+    let statusLabel =
+      status === "uploading"
+        ? "Uploading"
+        : status === "done"
+          ? "Complete"
+          : status === "error"
+            ? "Failed"
+            : "Queued";
+
+    if (status === "uploading" && entry.speed) {
+      statusLabel += " (" + formatBytes(entry.speed) + "/s";
+      if (entry.eta && entry.eta < 3600 * 24) {
+        const min = Math.floor(entry.eta / 60);
+        const sec = entry.eta % 60;
+        statusLabel += ", " + (min > 0 ? min + "m " : "") + sec + "s left";
+      }
+      statusLabel += ")";
+    }
+
     (entry.el.querySelector(".file-status") as HTMLElement).textContent = statusLabel;
-    (entry.el.querySelector(".file-progress") as HTMLElement).textContent = status === "done" ? "100%" : (entry.progress || 0) + "%";
-    (entry.el.querySelector(".progress-bar span") as HTMLElement).style.width = (entry.progress || 0) + "%";
+    (entry.el.querySelector(".file-progress") as HTMLElement).textContent =
+      status === "done" ? "100%" : (entry.progress || 0) + "%";
+    (entry.el.querySelector(".progress-bar span") as HTMLElement).style.width =
+      (entry.progress || 0) + "%";
   }
 
   function updateButtonState(): void {
@@ -274,7 +305,9 @@ interface UploadResponse {
     const files = Array.prototype.slice.call(list || []) as File[];
     if (!files.length) return;
     files.forEach((file: File) => {
-      const rel = sanitizeRelPath((file as any).webkitRelativePath || file.name);
+      const rel = sanitizeRelPath(
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+      );
       if (!rel) {
         addRejectedFile(file, "Invalid file path.");
         return;
@@ -301,14 +334,22 @@ interface UploadResponse {
       queue.push(entry);
       fileList.appendChild(createRow(entry));
     });
-    setStatus("Ready to upload " + files.length + " file" + (files.length === 1 ? "" : "s") + ".", "");
+    setStatus(
+      "Ready to upload " + files.length + " file" + (files.length === 1 ? "" : "s") + ".",
+      ""
+    );
     updateButtonState();
   }
 
-  function uploadEntry(entry: FileEntry): Promise<void> {
+  function uploadEntry(entry: FileEntry, attempt = 0): Promise<void> {
     return new Promise((resolve) => {
       entry.status = "uploading";
-      entry.progress = 0;
+      if (attempt === 0) {
+        entry.progress = 0;
+        entry.startTime = Date.now();
+        entry.lastTime = entry.startTime;
+        entry.lastLoaded = 0;
+      }
       updateRow(entry);
 
       const xhr = new XMLHttpRequest();
@@ -323,21 +364,46 @@ interface UploadResponse {
 
       xhr.upload.onprogress = (event: ProgressEvent) => {
         if (!event.lengthComputable) return;
+        const now = Date.now();
+        const duration = (now - (entry.startTime || now)) / 1000;
+        if (duration > 0) {
+          entry.speed = event.loaded / duration;
+          if (entry.speed > 0) {
+            entry.eta = Math.round((event.total - event.loaded) / entry.speed);
+          }
+        }
         entry.progress = Math.max(1, Math.floor((event.loaded / event.total) * 100));
         updateRow(entry);
       };
 
+      const handleRetry = () => {
+        const maxAttempts = 3;
+        if (attempt < maxAttempts) {
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          setStatus("Upload failed. Retrying in " + Math.round(delay / 1000) + "s...", "warning");
+          setTimeout(() => {
+            uploadEntry(entry, attempt + 1).then(resolve);
+          }, delay);
+        } else {
+          entry.status = "error";
+          updateRow(entry);
+          setStatus("Upload failed after " + (maxAttempts + 1) + " attempts.", "error");
+          resolve();
+        }
+      };
+
       xhr.onerror = () => {
-        entry.status = "error";
-        updateRow(entry);
-        setStatus("Upload failed. Please try again.", "error");
-        resolve();
+        handleRetry();
       };
 
       xhr.onload = () => {
         const data = parseJson<UploadResponse>(xhr.responseText || "");
         if (data && typeof data === "object") {
-          setCaptchaState(!!data.captcha_required, !!data.captcha_enabled, data.captcha_site_key || "");
+          setCaptchaState(
+            !!data.captcha_required,
+            !!data.captcha_enabled,
+            data.captcha_site_key || ""
+          );
         }
 
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -348,6 +414,11 @@ interface UploadResponse {
             setCaptchaState(false, captchaEnabled, captchaSiteKey);
           }
           resolve();
+          return;
+        }
+
+        if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504 || xhr.status === 0) {
+          handleRetry();
           return;
         }
 
@@ -362,7 +433,7 @@ interface UploadResponse {
         } else if (xhr.status === 400 || xhr.status === 413 || xhr.status === 415) {
           setStatus(data?.error || "Upload rejected.", "error");
         } else {
-          setStatus(data?.error || ("Upload failed (" + xhr.status + ")."), "error");
+          setStatus(data?.error || "Upload failed (" + xhr.status + ").", "error");
         }
 
         entry.status = "error";
@@ -383,12 +454,17 @@ interface UploadResponse {
     return new Promise((resolve) => {
       entry.status = "uploading";
       entry.progress = 0;
+      entry.startTime = Date.now();
       updateRow(entry);
 
       const total = entry.file!.size;
       let offset = 0;
-      let uploadId = entry.uploadId || "";
+      
+      // Try to resume session
+      const storageKey = `droppr_upload_${requestHash}_${entry.name}_${total}`;
+      let uploadId = entry.uploadId || localStorage.getItem(storageKey) || "";
       let mismatchRetries = 0;
+      let networkRetries = 0;
 
       function sendChunk(): void {
         if (offset >= total) {
@@ -402,7 +478,10 @@ interface UploadResponse {
         const end = Math.min(offset + CHUNK_SIZE, total);
         const blob = entry.file!.slice(offset, end);
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/droppr/requests/" + encodeURIComponent(requestHash) + "/upload-chunk");
+        xhr.open(
+          "POST",
+          "/api/droppr/requests/" + encodeURIComponent(requestHash) + "/upload-chunk"
+        );
         xhr.timeout = 0;
         xhr.setRequestHeader("Content-Range", "bytes " + offset + "-" + (end - 1) + "/" + total);
         xhr.setRequestHeader("X-Upload-Offset", String(offset));
@@ -421,32 +500,65 @@ interface UploadResponse {
 
         xhr.upload.onprogress = (event: ProgressEvent) => {
           if (!event.lengthComputable) return;
-          const pct = Math.floor(((offset + event.loaded) / total) * 100);
+          const currentLoaded = offset + event.loaded;
+          const now = Date.now();
+          const duration = (now - (entry.startTime || now)) / 1000;
+          if (duration > 0) {
+            entry.speed = currentLoaded / duration;
+            if (entry.speed > 0) {
+              entry.eta = Math.round((total - currentLoaded) / entry.speed);
+            }
+          }
+          const pct = Math.floor((currentLoaded / total) * 100);
           entry.progress = Math.max(1, Math.min(99, pct));
           updateRow(entry);
         };
 
+        const handleChunkRetry = () => {
+          const maxRetries = 5;
+          if (networkRetries < maxRetries) {
+            const delay = Math.pow(2, networkRetries) * 1000 + Math.random() * 1000;
+            setStatus(
+              "Chunk upload failed. Retrying in " + Math.round(delay / 1000) + "s...",
+              "warning"
+            );
+            networkRetries += 1;
+            setTimeout(sendChunk, delay);
+          } else {
+            entry.status = "error";
+            updateRow(entry);
+            setStatus("Upload failed after " + (maxRetries + 1) + " network retries.", "error");
+            resolve();
+          }
+        };
+
         xhr.onerror = () => {
-          entry.status = "error";
-          updateRow(entry);
-          setStatus("Upload failed. Please try again.", "error");
-          resolve();
+          handleChunkRetry();
         };
 
         xhr.onload = () => {
           const data = parseJson<UploadResponse>(xhr.responseText || "");
           if (data && typeof data === "object") {
-            setCaptchaState(!!data.captcha_required, !!data.captcha_enabled, data.captcha_site_key || "");
+            setCaptchaState(
+              !!data.captcha_required,
+              !!data.captcha_enabled,
+              data.captcha_site_key || ""
+            );
           }
 
           if (xhr.status >= 200 && xhr.status < 300) {
+            networkRetries = 0; // Reset network retries on success
             uploadId = data?.upload_id || uploadId;
             entry.uploadId = uploadId;
+            if (uploadId) {
+              localStorage.setItem(storageKey, uploadId);
+            }
 
             if (data?.complete) {
               entry.status = "done";
               entry.progress = 100;
               updateRow(entry);
+              localStorage.removeItem(storageKey);
               if (captchaRequired) {
                 setCaptchaState(false, captchaEnabled, captchaSiteKey);
               }
@@ -462,10 +574,27 @@ interface UploadResponse {
             return;
           }
 
-          if (xhr.status === 409 && typeof data?.offset === "number" && mismatchRetries < 2) {
-            mismatchRetries += 1;
+          if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504 || xhr.status === 0) {
+            handleChunkRetry();
+            return;
+          }
+
+          if (xhr.status === 409 && typeof data?.offset === "number") {
+            console.log("Offset mismatch, server has: " + data.offset + ", client sent: " + offset);
             offset = data.offset;
-            sendChunk();
+            mismatchRetries += 1;
+            if (mismatchRetries < 5) {
+              sendChunk();
+              return;
+            }
+          }
+
+          if (xhr.status === 404) {
+            localStorage.removeItem(storageKey);
+            setStatus(data?.error || "Upload session lost. Restarting...", "warning");
+            uploadId = "";
+            offset = 0;
+            setTimeout(sendChunk, 1000);
             return;
           }
 
@@ -478,9 +607,10 @@ interface UploadResponse {
           } else if (xhr.status === 429) {
             setStatus(data?.error || "Too many attempts. Try again later.", "error");
           } else if (xhr.status === 400 || xhr.status === 413 || xhr.status === 415) {
+            localStorage.removeItem(storageKey);
             setStatus(data?.error || "Upload rejected.", "error");
           } else {
-            setStatus(data?.error || ("Upload failed (" + xhr.status + ")."), "error");
+            setStatus(data?.error || "Upload failed (" + xhr.status + ").", "error");
           }
 
           entry.status = "error";
@@ -575,7 +705,11 @@ interface UploadResponse {
         return res.text().then((text: string) => {
           let data: RequestMetaResponse | null = null;
           if (text) {
-            try { data = JSON.parse(text); } catch { data = null; }
+            try {
+              data = JSON.parse(text);
+            } catch {
+              data = null;
+            }
           }
           if (!res.ok) {
             const msg = data?.error || "Request unavailable";
@@ -586,7 +720,11 @@ interface UploadResponse {
       })
       .then((data: RequestMetaResponse) => {
         requiresPassword = !!data.requires_password;
-        setCaptchaState(!!data.captcha_required, !!data.captcha_enabled, data.captcha_site_key || "");
+        setCaptchaState(
+          !!data.captcha_required,
+          !!data.captcha_enabled,
+          data.captcha_site_key || ""
+        );
         allowedExtensions = normalizeExtensions(data.allowed_extensions || []);
         maxFileSize = data.max_file_size || 0;
         updateDropzoneHint();

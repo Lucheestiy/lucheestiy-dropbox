@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 from werkzeug.security import check_password_hash
 
 from ..middleware.rate_limit import limiter
+from ..services.analytics import _log_audit_event
 
 
 def create_droppr_requests_blueprint(require_admin_access, deps: dict):
@@ -66,13 +67,17 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
             return jsonify(payload), 429
 
         if captcha_required_for_request(share_hash, client_ip):
-            captcha_token = request.headers.get("X-Captcha-Token") or request.form.get("captcha_token") or ""
+            captcha_token = (
+                request.headers.get("X-Captcha-Token") or request.form.get("captcha_token") or ""
+            )
             if not verify_captcha_token(captcha_token, client_ip):
                 payload = {"error": "Captcha verification required."}
                 payload.update(captcha_payload(True))
                 return jsonify(payload), 403
 
-        raw_password = request.headers.get("X-Request-Password") or request.form.get("password") or ""
+        raw_password = (
+            request.headers.get("X-Request-Password") or request.form.get("password") or ""
+        )
         raw_password = unquote(raw_password) if raw_password else ""
         if not raw_password or not check_password_hash(str(stored_hash), raw_password):
             failures = record_request_password_failure(share_hash, client_ip)
@@ -111,7 +116,9 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
         if not meta or not parse_bool(meta.get("isDir")):
             return jsonify({"error": "Folder not found"}), 404
 
-        hours_raw = payload.get("expires_hours") or payload.get("expiresHours") or payload.get("hours") or 0
+        hours_raw = (
+            payload.get("expires_hours") or payload.get("expiresHours") or payload.get("hours") or 0
+        )
         try:
             hours = int(str(hours_raw).strip() or "0")
         except (TypeError, ValueError):
@@ -129,7 +136,18 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
         expires_at = int(time.time()) + (hours * 3600) if hours > 0 else None
 
         try:
-            record = create_file_request_record(path=safe_path, password_hash=password_hash, expires_at=expires_at)
+            record = create_file_request_record(
+                path=safe_path, password_hash=password_hash, expires_at=expires_at
+            )
+            _log_audit_event(
+                "create_file_request",
+                target=record["hash"],
+                detail={
+                    "path": safe_path,
+                    "has_password": bool(password_hash),
+                    "hours": hours,
+                },
+            )
         except Exception:
             return jsonify({"error": "Failed to create request link"}), 500
 
@@ -262,7 +280,9 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
                 except Exception:
                     pass
             with open(tmp_path, "wb") as handle:
-                stored_size = copy_stream_with_limit(file_storage.stream, handle, upload_max_bytes or None)
+                stored_size = copy_stream_with_limit(
+                    file_storage.stream, handle, upload_max_bytes or None
+                )
             os.replace(tmp_path, target)
         except upload_validation_error as exc:
             try:
@@ -284,7 +304,11 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
             {
                 "name": os.path.basename(target),
                 "path": rel_stored,
-                "size": stored_size if stored_size is not None else (os.path.getsize(target) if os.path.exists(target) else None),
+                "size": (
+                    stored_size
+                    if stored_size is not None
+                    else (os.path.getsize(target) if os.path.exists(target) else None)
+                ),
             }
         )
         resp.headers["Cache-Control"] = "no-store"
@@ -320,11 +344,15 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
             offset, end, total = content_range
         else:
             try:
-                offset = int(request.headers.get("X-Upload-Offset") or request.form.get("offset") or 0)
+                offset = int(
+                    request.headers.get("X-Upload-Offset") or request.form.get("offset") or 0
+                )
             except (TypeError, ValueError):
                 offset = None
             try:
-                total = int(request.headers.get("X-Upload-Length") or request.form.get("total") or 0)
+                total = int(
+                    request.headers.get("X-Upload-Length") or request.form.get("total") or 0
+                )
             except (TypeError, ValueError):
                 total = None
             length = request.content_length
@@ -343,7 +371,9 @@ def create_droppr_requests_blueprint(require_admin_access, deps: dict):
             return jsonify({"error": "Invalid request folder"}), 400
 
         upload_id = normalize_chunk_upload_id(
-            request.headers.get("X-Upload-Id") or request.form.get("upload_id") or request.args.get("upload_id")
+            request.headers.get("X-Upload-Id")
+            or request.form.get("upload_id")
+            or request.args.get("upload_id")
         )
 
         rel_path = (

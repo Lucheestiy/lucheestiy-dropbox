@@ -11,7 +11,9 @@ from flask import request
 ADMIN_TOTP_SECRETS_RAW = (
     os.environ.get("DROPPR_ADMIN_TOTP_SECRET") or os.environ.get("DROPPR_ADMIN_TOTP_SECRETS") or ""
 ).strip()
-ADMIN_TOTP_SECRETS = [s.strip().replace(" ", "") for s in ADMIN_TOTP_SECRETS_RAW.split(",") if s.strip()]
+ADMIN_TOTP_SECRETS = [
+    s.strip().replace(" ", "") for s in ADMIN_TOTP_SECRETS_RAW.split(",") if s.strip()
+]
 ADMIN_TOTP_ENABLED = bool(ADMIN_TOTP_SECRETS)
 try:
     ADMIN_TOTP_STEP_SECONDS = int(os.environ.get("DROPPR_ADMIN_TOTP_STEP_SECONDS", "30"))

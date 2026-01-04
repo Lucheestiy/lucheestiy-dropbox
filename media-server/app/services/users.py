@@ -20,17 +20,27 @@ try:
 except (TypeError, ValueError):
     USER_PASSWORD_MIN_LEN = 8
 USER_PASSWORD_MIN_LEN = max(6, USER_PASSWORD_MIN_LEN)
-USER_PASSWORD_REQUIRE_UPPER = parse_bool(os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_UPPER", "true"))
-USER_PASSWORD_REQUIRE_LOWER = parse_bool(os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_LOWER", "true"))
-USER_PASSWORD_REQUIRE_DIGIT = parse_bool(os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_DIGIT", "true"))
-USER_PASSWORD_REQUIRE_SYMBOL = parse_bool(os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_SYMBOL", "true"))
+USER_PASSWORD_REQUIRE_UPPER = parse_bool(
+    os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_UPPER", "true")
+)
+USER_PASSWORD_REQUIRE_LOWER = parse_bool(
+    os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_LOWER", "true")
+)
+USER_PASSWORD_REQUIRE_DIGIT = parse_bool(
+    os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_DIGIT", "true")
+)
+USER_PASSWORD_REQUIRE_SYMBOL = parse_bool(
+    os.environ.get("DROPPR_USER_PASSWORD_REQUIRE_SYMBOL", "true")
+)
 USER_PASSWORD_PWNED_CHECK = parse_bool(os.environ.get("DROPPR_PASSWORD_PWNED_CHECK", "false"))
 try:
     USER_PASSWORD_PWNED_MIN_COUNT = int(os.environ.get("DROPPR_PASSWORD_PWNED_MIN_COUNT", "1"))
 except (TypeError, ValueError):
     USER_PASSWORD_PWNED_MIN_COUNT = 1
 try:
-    USER_PASSWORD_PWNED_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_PASSWORD_PWNED_TIMEOUT_SECONDS", "5"))
+    USER_PASSWORD_PWNED_TIMEOUT_SECONDS = float(
+        os.environ.get("DROPPR_PASSWORD_PWNED_TIMEOUT_SECONDS", "5")
+    )
 except (TypeError, ValueError):
     USER_PASSWORD_PWNED_TIMEOUT_SECONDS = 5.0
 
@@ -41,6 +51,10 @@ PASSWORD_SYMBOL_RE = re.compile(r"[^A-Za-z0-9]")
 
 
 def _normalize_username(value: str | None) -> str | None:
+    """
+    Validates and normalizes a username.
+    Must be alphanumeric, start with a letter/digit, and be 3-32 characters.
+    """
     if value is None:
         return None
     value = str(value).strip()
@@ -122,7 +136,10 @@ def _ensure_user_directory(scope_path: str) -> str:
     target = _safe_join(base_abs, rel)
     if not target:
         raise RuntimeError("Invalid user directory")
-    os.makedirs(target, exist_ok=True)
+    try:
+        os.makedirs(target, exist_ok=True)
+    except FileExistsError:
+        pass
     if not os.path.isdir(target):
         raise RuntimeError("User directory is not a directory")
     return target

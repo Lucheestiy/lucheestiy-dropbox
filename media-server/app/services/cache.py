@@ -20,6 +20,10 @@ _redis_lock = threading.Lock()
 
 
 def _get_redis_client() -> redis.Redis | None:
+    """
+    Returns a lazily-initialized Redis client if REDIS_URL is configured.
+    Includes a connection timeout and ping check.
+    """
     if not REDIS_ENABLED:
         return None
     global _redis_client
@@ -44,6 +48,7 @@ def _get_redis_client() -> redis.Redis | None:
 
 
 def _redis_share_cache_key(share_hash: str) -> str:
+    """Returns the formatted Redis key for a given share hash."""
     return f"{REDIS_SHARE_CACHE_PREFIX}{share_hash}"
 
 
@@ -54,6 +59,10 @@ def _redis_share_cache_get(
     recursive: bool,
     max_age_seconds: int,
 ) -> list[dict] | None:
+    """
+    Attempts to retrieve the file list for a share from Redis.
+    Validates the source_hash, recursive flag, and cache age.
+    """
     client = _get_redis_client()
     if not client:
         return None
@@ -85,6 +94,9 @@ def _redis_share_cache_set(
     files: list[dict],
     ttl_seconds: int,
 ) -> None:
+    """
+    Stores a share's file list in Redis with a specified TTL.
+    """
     client = _get_redis_client()
     if not client:
         return
@@ -96,7 +108,9 @@ def _redis_share_cache_set(
     }
     try:
         ttl = max(1, int(ttl_seconds))
-        client.setex(_redis_share_cache_key(request_hash), ttl, json.dumps(payload, separators=(",", ":")))
+        client.setex(
+            _redis_share_cache_key(request_hash), ttl, json.dumps(payload, separators=(",", ":"))
+        )
     except Exception as exc:
         logger.warning("Redis cache set failed: %s", exc)
 

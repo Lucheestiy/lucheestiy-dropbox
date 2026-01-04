@@ -1,0 +1,32 @@
+[project]
+name = "droppr-media-server"
+version = "0.1.0"
+dependencies = [
+    "flask",
+    "requests",
+    "gunicorn",
+    "flask-limiter",
+    "redis",
+    "celery",
+    "prometheus-client",
+    "sentry-sdk",
+    "boto3",
+    "SQLAlchemy",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "PL"]
+ignore = ["PLR0913", "PLR0912", "PLR0915"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true

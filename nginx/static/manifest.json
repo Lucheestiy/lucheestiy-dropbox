@@ -1,0 +1,16 @@
+{
+  "name": "Droppr - Shared Media",
+  "short_name": "Droppr",
+  "description": "Securely view and download shared media files.",
+  "start_url": "/gallery/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0061ff",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

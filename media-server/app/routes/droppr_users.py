@@ -4,9 +4,9 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+from ..services.analytics import _log_audit_event
 from ..services.container import get_services
 from ..services.users import (
-    USERNAME_RE,
     USER_PASSWORD_MIN_LEN,
     USER_PASSWORD_PWNED_CHECK,
     USER_PASSWORD_REQUIRE_DIGIT,
@@ -14,6 +14,7 @@ from ..services.users import (
     USER_PASSWORD_REQUIRE_SYMBOL,
     USER_PASSWORD_REQUIRE_UPPER,
     USER_SCOPE_ROOT,
+    USERNAME_RE,
     _build_user_scope,
     _ensure_user_directory,
     _normalize_username,
@@ -53,7 +54,9 @@ def create_droppr_users_blueprint(require_admin_access):
             return resp
 
         payload = request.get_json(silent=True) or {}
-        username = _normalize_username(payload.get("username") or payload.get("user") or payload.get("name"))
+        username = _normalize_username(
+            payload.get("username") or payload.get("user") or payload.get("name")
+        )
         if not username:
             return jsonify({"error": "Invalid username"}), 400
 
@@ -72,7 +75,9 @@ def create_droppr_users_blueprint(require_admin_access):
 
         services = get_services()
         try:
-            user = services.filebrowser.create_user(token=token, username=username, password=password, scope=scope)
+            user = services.filebrowser.create_user(
+                token=token, username=username, password=password, scope=scope
+            )
         except FileExistsError:
             return jsonify({"error": "User already exists"}), 409
         except PermissionError:
@@ -80,6 +85,15 @@ def create_droppr_users_blueprint(require_admin_access):
         except Exception as exc:
             logger.error("Failed to create user %s: %s", username, exc)
             return jsonify({"error": "Failed to create user"}), 502
+
+        _log_audit_event(
+            "create_user",
+            target=username,
+            detail={
+                "scope": scope,
+                "user_id": user.get("id") if isinstance(user, dict) else None,
+            },
+        )
 
         resp = jsonify(
             {

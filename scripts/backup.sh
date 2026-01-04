@@ -32,6 +32,18 @@ fi
 mkdir -p "$BACKUP_DIR/databases"
 if compgen -G "$ROOT_DIR/database/*.sqlite3" > /dev/null; then
   cp -f "$ROOT_DIR"/database/*.sqlite3 "$BACKUP_DIR/databases/"
+  
+  if command -v sqlite3 >/dev/null; then
+    log "Verifying database integrity..."
+    for bdb in "$BACKUP_DIR/databases"/*.sqlite3; do
+      [ -f "$bdb" ] || continue
+      if ! sqlite3 "$bdb" "PRAGMA integrity_check;" | grep -q "ok"; then
+        log "WARNING: Integrity check failed for $bdb"
+      else
+        log "Integrity check passed for $(basename "$bdb")"
+      fi
+    done
+  fi
 fi
 
 if [ -f "$ROOT_DIR/database/redis/dump.rdb" ]; then

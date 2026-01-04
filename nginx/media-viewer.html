@@ -1,211 +1,232 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Media Viewer - Dropbox</title>
-    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
-    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="manifest" href="/static/manifest.json" />
+    <meta name="theme-color" content="#0061ff" />
+    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
+          sans-serif;
+        background: #1a1a1a;
+        color: #fff;
+        overflow-x: hidden;
+      }
+
+      .header {
+        background: #2d2d2d;
+        padding: 1rem 2rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      }
+
+      .header h1 {
+        font-size: 1.5rem;
+        font-weight: 300;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .media-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+      }
+
+      .media-card {
+        background: #2d2d2d;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        transition:
+          transform 0.3s ease,
+          box-shadow 0.3s ease;
+      }
+
+      .media-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      }
+
+      .media-preview {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        cursor: pointer;
+      }
+
+      .media-info {
+        padding: 1rem;
+      }
+
+      .media-title {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #4caf50;
+      }
+
+      .media-size {
+        color: #888;
+        font-size: 0.9rem;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(5px);
+      }
+
+      .modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        max-width: 90%;
+        max-height: 90%;
+      }
+
+      .modal img,
+      .modal video {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 8px;
+      }
+
+      .close {
+        position: absolute;
+        top: 20px;
+        right: 40px;
+        color: #fff;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 1001;
+      }
+
+      .close:hover {
+        color: #4caf50;
+      }
+
+      .download-btn {
+        display: inline-block;
+        background: #4caf50;
+        color: white;
+        padding: 0.5rem 1rem;
+        text-decoration: none;
+        border-radius: 6px;
+        margin-top: 0.5rem;
+        transition: background 0.3s ease;
+      }
+
+      .download-btn:hover {
+        background: #45a049;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 3rem;
+        color: #888;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-left-color: #4caf50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+
+      @keyframes spin {
+        100% {
+          transform: rotate(360deg);
         }
-        
-        body {
-            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-            background: #1a1a1a;
-            color: #fff;
-            overflow-x: hidden;
-        }
-        
-        .header {
-            background: #2d2d2d;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        
-        .header h1 {
-            font-size: 1.5rem;
-            font-weight: 300;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        
-        .media-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .media-card {
-            background: #2d2d2d;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        
-        .media-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-        }
-        
-        .media-preview {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-            cursor: pointer;
-        }
-        
-        .media-info {
-            padding: 1rem;
-        }
-        
-        .media-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #4CAF50;
-        }
-        
-        .media-size {
-            color: #888;
-            font-size: 0.9rem;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.95);
-            backdrop-filter: blur(5px);
-        }
-        
-        .modal-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            max-width: 90%;
-            max-height: 90%;
-        }
-        
-        .modal img, .modal video {
-            max-width: 100%;
-            max-height: 100%;
-            border-radius: 8px;
-        }
-        
-        .close {
-            position: absolute;
-            top: 20px;
-            right: 40px;
-            color: #fff;
-            font-size: 40px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1001;
-        }
-        
-        .close:hover {
-            color: #4CAF50;
-        }
-        
-        .download-btn {
-            display: inline-block;
-            background: #4CAF50;
-            color: white;
-            padding: 0.5rem 1rem;
-            text-decoration: none;
-            border-radius: 6px;
-            margin-top: 0.5rem;
-            transition: background 0.3s ease;
-        }
-        
-        .download-btn:hover {
-            background: #45a049;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 3rem;
-            color: #888;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #4CAF50;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        
-        .video-loader {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            padding: 2rem;
-            border-radius: 1rem;
-            text-align: center;
-            z-index: 10;
-            display: none;
-        }
-        
-        .error {
-            text-align: center;
-            padding: 3rem;
-            color: #f44336;
-        }
+      }
+
+      .video-loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 2rem;
+        border-radius: 1rem;
+        text-align: center;
+        z-index: 10;
+        display: none;
+      }
+
+      .error {
+        text-align: center;
+        padding: 3rem;
+        color: #f44336;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="header">
-        <h1>📁 Shared Media Files</h1>
-    </div>
-    
-    <div class="container">
-        <div id="loading" class="loading">
-            <h2>Loading media files...</h2>
-        </div>
-        
-        <div id="error" class="error" style="display: none;">
-            <h2>❌ Error loading files</h2>
-            <p>Please check your share link and try again.</p>
-        </div>
-        
-        <div id="media-container" class="media-grid" style="display: none;">
-            <!-- Media files will be populated here -->
-        </div>
-    </div>
-    
-    <!-- Modal for full-size viewing -->
-    <div id="modal" class="modal">
-        <span class="close">&times;</span>
-        <div class="modal-content" id="modal-content">
-            <!-- Media will be displayed here -->
-        </div>
+      <h1>📁 Shared Media Files</h1>
     </div>
 
-    <script defer src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js" crossorigin="anonymous"></script>
+    <div class="container">
+      <div id="loading" class="loading">
+        <h2>Loading media files...</h2>
+      </div>
+
+      <div id="error" class="error" style="display: none">
+        <h2>❌ Error loading files</h2>
+        <p>Please check your share link and try again.</p>
+      </div>
+
+      <div id="media-container" class="media-grid" style="display: none">
+        <!-- Media files will be populated here -->
+      </div>
+    </div>
+
+    <!-- Modal for full-size viewing -->
+    <div id="modal" class="modal">
+      <span class="close">&times;</span>
+      <div class="modal-content" id="modal-content">
+        <!-- Media will be displayed here -->
+      </div>
+    </div>
+
+    <script
+      defer
+      src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script defer src="/static/config.js?v=2"></script>
     <script defer src="/static/sentry-init.js?v=1"></script>
     <script defer src="/static/media-viewer.js?v=1"></script>
     <script defer src="/static/sw-register.js?v=1"></script>
-</body>
+  </body>
 </html>

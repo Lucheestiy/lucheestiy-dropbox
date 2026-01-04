@@ -5,8 +5,27 @@ on:
   pull_request:
 
 jobs:
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r media-server/requirements.txt -r media-server/requirements-dev.txt
+      - name: Run Ruff
+        working-directory: media-server
+        run: ruff check app/
+      - name: Run Mypy
+        working-directory: media-server
+        run: mypy app/
+
   backend-tests:
     runs-on: ubuntu-latest
+    needs: backend-lint
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,15 +37,30 @@ jobs:
           pip install -r media-server/requirements.txt -r media-server/requirements-dev.txt
       - name: Run backend tests
         working-directory: media-server
-        run: pytest -q
+        run: pytest -v --cov=app
 
-  frontend-tests:
+  frontend-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+      - name: Install frontend dependencies
+        working-directory: nginx
+        run: npm install
+      - name: Run ESLint
+        working-directory: nginx
+        run: npm run lint
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install frontend dependencies
         working-directory: nginx
         run: npm install

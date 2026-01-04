@@ -12,7 +12,7 @@ describe("sw-register", () => {
     const register = vi.fn(() => Promise.resolve());
     Object.defineProperty(window.navigator, "serviceWorker", {
       value: { register },
-      configurable: true
+      configurable: true,
     });
 
     window.eval(script);

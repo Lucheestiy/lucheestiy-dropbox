@@ -65,7 +65,9 @@ else:
 
 try:
     UPLOAD_MAX_BYTES = int(
-        os.environ.get("DROPPR_REQUEST_MAX_UPLOAD_BYTES") or os.environ.get("DROPPR_UPLOAD_MAX_BYTES") or "0"
+        os.environ.get("DROPPR_REQUEST_MAX_UPLOAD_BYTES")
+        or os.environ.get("DROPPR_UPLOAD_MAX_BYTES")
+        or "0"
     )
 except (TypeError, ValueError):
     UPLOAD_MAX_BYTES = 0
@@ -371,7 +373,7 @@ def _chunk_upload_paths(base_dir: str, upload_id: str) -> tuple[str, str]:
 def _load_chunk_upload_meta(base_dir: str, upload_id: str) -> dict | None:
     meta_path, _ = _chunk_upload_paths(base_dir, upload_id)
     try:
-        with open(meta_path, "r", encoding="utf-8") as handle:
+        with open(meta_path, encoding="utf-8") as handle:
             data = json.load(handle)
         return data if isinstance(data, dict) else None
     except Exception:

@@ -8,6 +8,6 @@
     dsn: cfg.sentryDsn,
     environment: cfg.sentryEnv || "production",
     release: cfg.sentryRelease || undefined,
-    tracesSampleRate: Number(cfg.sentryTracesSampleRate || 0)
+    tracesSampleRate: Number(cfg.sentryTracesSampleRate || 0),
   });
 })();

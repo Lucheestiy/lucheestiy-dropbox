@@ -23,50 +23,66 @@ Provides:
 
 from __future__ import annotations
 
-import fcntl
-import hmac
 import ipaddress
-import json
-import logging
 import os
 import re
-import sentry_sdk
+import secrets
 import threading
 import time
-import secrets
 from collections import deque
 
 import requests
+import sentry_sdk
 from celery import Celery
 from flask import Flask, g, has_request_context, jsonify, request
-from .middleware.rate_limit import init_rate_limiter, limiter
-from prometheus_client import (
-    Counter,
-    Gauge,
-    Histogram,
-)
 from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.security import generate_password_hash
 
 from .config import load_flask_config, parse_bool
 from .logging_config import REQUEST_ID_HEADER, REQUEST_ID_RE, configure_logging
-from .services.filebrowser import (
-    FILEBROWSER_BASE_URL,
-    FILEBROWSER_PUBLIC_DL_API,
-    _create_filebrowser_share,
-    _create_filebrowser_user,
-    _fetch_filebrowser_resource,
-    _fetch_filebrowser_shares,
-    _fetch_public_share_json,
+from .metrics import (
+    BACKGROUND_TASKS,
+    METRICS_ENABLED,
+    REQUEST_COUNT,
+    REQUEST_ERRORS,
+    REQUEST_IN_FLIGHT,
+    REQUEST_LATENCY,
+    SHARE_CACHE_HITS,
+    SHARE_CACHE_MISSES,
+    THUMBNAIL_COUNT,
+    VIDEO_TRANSCODE_COUNT,
+    VIDEO_TRANSCODE_LATENCY,
+)
+from .middleware.rate_limit import init_rate_limiter
+from .routes.analytics import create_analytics_blueprint
+from .routes.comments import create_comments_blueprint
+from .routes.droppr_aliases import create_droppr_aliases_blueprint
+from .routes.droppr_auth import create_droppr_auth_blueprint
+from .routes.droppr_media import create_droppr_media_blueprint
+from .routes.droppr_requests import create_droppr_requests_blueprint
+from .routes.droppr_shares import create_droppr_shares_blueprint
+from .routes.droppr_users import create_droppr_users_blueprint
+from .routes.health import health_bp
+from .routes.metrics import metrics_bp
+from .routes.share import create_share_blueprint
+from .routes.share_media import create_share_media_blueprint
+from .services.aliases import (
+    _get_share_alias_meta,
+    _increment_share_alias_download_count,
+    _resolve_share_hash,
+)
+from .services.analytics import (
+    ANALYTICS_ENABLED,
+    _analytics_conn,
+    _log_auth_event,
+    _log_event,
 )
 from .services.cache import (
     REDIS_ENABLED,
-    _redis_share_cache_delete,
     _redis_share_cache_get,
     _redis_share_cache_set,
 )
 from .services.container import init_services
-from .services.secrets import _load_external_secrets
 from .services.file_requests import (
     CAPTCHA_ENABLED,
     REQUEST_PASSWORD_CAPTCHA_THRESHOLD,
@@ -83,6 +99,12 @@ from .services.file_requests import (
     _resolve_request_dir,
     _verify_captcha_token,
 )
+from .services.filebrowser import (
+    FILEBROWSER_BASE_URL,
+    FILEBROWSER_PUBLIC_DL_API,
+    _fetch_filebrowser_resource,
+    _fetch_public_share_json,
+)
 from .services.media_processing import (
     HLS_CACHE_DIR,
     HLS_RENDITIONS,
@@ -92,12 +114,13 @@ from .services.media_processing import (
     THUMB_MULTI_DEFAULT,
     THUMB_MULTI_MAX,
     _enqueue_r2_upload_file,
-    _enqueue_r2_upload_hls,
     _ensure_fast_proxy_mp4,
     _ensure_hd_mp4,
     _ensure_hls_package,
     _ffmpeg_thumbnail_cmd,
     _get_cache_path,
+    _hd_cache_key,
+    _hls_cache_key,
     _maybe_redirect_r2,
     _normalize_preview_format,
     _normalize_thumb_width,
@@ -105,8 +128,6 @@ from .services.media_processing import (
     _preview_fallbacks,
     _preview_mimetype,
     _proxy_cache_key,
-    _hd_cache_key,
-    _hls_cache_key,
     _r2_available_url,
     _r2_hls_key,
     _r2_proxy_key,
@@ -118,102 +139,50 @@ from .services.media_processing import (
     _thumb_sema,
     configure_enqueue_task,
 )
-from .services.video_meta import _ensure_video_meta_record, _ffprobe_video_meta
-from .services.share_cache import _share_cache_lock, _share_files_cache, clear_share_cache
+from .services.metrics import METRICS_ENABLED
+from .services.secrets import _load_external_secrets
 from .services.share import (
     _build_file_share_file_list,
     _build_folder_share_file_list,
 )
-from .utils.security import _with_internal_signature
+from .services.share_cache import _share_cache_lock, _share_files_cache
+from .services.video_meta import _ensure_video_meta_record, _ffprobe_video_meta
+from .utils.config_validation import validate_config
 from .utils.filesystem import _ensure_unique_path
 from .utils.jwt import (
-    _b64url_decode,
-    _b64url_encode,
     _decode_jwt,
     _encode_jwt,
     _peek_jwt_payload,
 )
-from .routes.health import health_bp
-from .routes.metrics import metrics_bp
-from .routes.analytics import create_analytics_blueprint
-from .routes.droppr_aliases import create_droppr_aliases_blueprint
-from .routes.droppr_shares import create_droppr_shares_blueprint
-from .routes.droppr_media import create_droppr_media_blueprint
-from .routes.droppr_requests import create_droppr_requests_blueprint
-from .routes.droppr_users import create_droppr_users_blueprint
-from .routes.droppr_auth import create_droppr_auth_blueprint
-from .routes.share import create_share_blueprint
-from .routes.share_media import create_share_media_blueprint
 from .utils.request import _get_rate_limit_key, _get_request_ip
-from .services.metrics import METRICS_ENABLED, _get_metrics_registry
-from .services.analytics import (
-    ANALYTICS_ENABLED,
-    ANALYTICS_IP_MODE,
-    ANALYTICS_LOG_FILE_DOWNLOADS,
-    ANALYTICS_LOG_GALLERY_VIEWS,
-    ANALYTICS_LOG_ZIP_DOWNLOADS,
-    ANALYTICS_RETENTION_DAYS,
-    _analytics_cache_get,
-    _analytics_cache_set,
-    _analytics_conn,
-    _get_time_range,
-    _log_auth_event,
-    _log_event,
-    _parse_int,
-)
-from .services.users import (
-    USERNAME_RE,
-    USER_DATA_DIR,
-    USER_PASSWORD_MIN_LEN,
-    USER_PASSWORD_PWNED_CHECK,
-    USER_PASSWORD_REQUIRE_DIGIT,
-    USER_PASSWORD_REQUIRE_LOWER,
-    USER_PASSWORD_REQUIRE_SYMBOL,
-    USER_PASSWORD_REQUIRE_UPPER,
-    USER_SCOPE_ROOT,
-    _build_user_scope,
-    _ensure_user_directory,
-    _normalize_password,
-    _normalize_username,
-    _password_rules_error,
-)
+from .utils.security import _with_internal_signature
 from .utils.totp import ADMIN_TOTP_ENABLED, _get_totp_code_from_request, _is_valid_totp
-from .services.aliases import (
-    _list_share_aliases,
-    _resolve_share_hash,
-    _upsert_share_alias,
-)
 from .utils.validation import (
     IMAGE_EXTS,
-    is_valid_share_hash,
-    UPLOAD_ALLOWED_EXTS,
     UPLOAD_ALLOW_ALL_EXTS,
+    UPLOAD_ALLOWED_EXTS,
     UPLOAD_MAX_BYTES,
     UPLOAD_SESSION_DIRNAME,
     VIDEO_EXTS,
     UploadValidationError,
     _chunk_upload_paths,
     _copy_stream_with_limit,
-    _encode_share_path,
-    _extract_extension,
     _load_chunk_upload_meta,
     _normalize_chunk_upload_id,
-    _normalize_ip,
     _normalize_upload_rel_path,
     _parse_content_range,
     _safe_join,
     _safe_rel_path,
     _safe_root_path,
     _save_chunk_upload_meta,
-    _sniff_mime_type,
     _validate_chunk_upload_type,
     _validate_upload_size,
     _validate_upload_type,
+    is_valid_share_hash,
 )
 
-
 _load_external_secrets()
-
+validate_config()
 
 app = Flask(__name__)
 for key, value in load_flask_config().items():
@@ -222,49 +191,6 @@ for key, value in load_flask_config().items():
 configure_logging(app)
 init_services(app)
 
-if METRICS_ENABLED:
-    REQUEST_LATENCY = Histogram(
-        "droppr_http_request_duration_seconds",
-        "HTTP request latency",
-        ["method", "endpoint"],
-    )
-    REQUEST_COUNT = Counter(
-        "droppr_http_requests_total",
-        "Total HTTP requests",
-        ["method", "endpoint", "status"],
-    )
-    REQUEST_ERRORS = Counter(
-        "droppr_http_request_errors_total",
-        "HTTP error responses",
-        ["method", "endpoint", "status"],
-    )
-    REQUEST_IN_FLIGHT = Gauge(
-        "droppr_http_requests_in_flight",
-        "In-flight HTTP requests",
-    )
-    SHARE_CACHE_HITS = Counter(
-        "droppr_share_cache_hits_total",
-        "Share cache hits",
-        ["layer"],
-    )
-    SHARE_CACHE_MISSES = Counter(
-        "droppr_share_cache_misses_total",
-        "Share cache misses",
-        ["layer"],
-    )
-    BACKGROUND_TASKS = Gauge(
-        "droppr_background_tasks",
-        "Background tasks running",
-    )
-else:
-    REQUEST_LATENCY = None
-    REQUEST_COUNT = None
-    REQUEST_ERRORS = None
-    REQUEST_IN_FLIGHT = None
-    SHARE_CACHE_HITS = None
-    SHARE_CACHE_MISSES = None
-    BACKGROUND_TASKS = None
-
 
 def _generate_request_id(raw: str | None) -> str:
     candidate = (raw or "").strip()
@@ -272,8 +198,11 @@ def _generate_request_id(raw: str | None) -> str:
         return candidate
     return secrets.token_urlsafe(12)
 
+
 SENTRY_DSN = (os.environ.get("DROPPR_SENTRY_DSN") or "").strip()
-SENTRY_ENV = (os.environ.get("DROPPR_SENTRY_ENV") or os.environ.get("SENTRY_ENVIRONMENT") or "production").strip()
+SENTRY_ENV = (
+    os.environ.get("DROPPR_SENTRY_ENV") or os.environ.get("SENTRY_ENVIRONMENT") or "production"
+).strip()
 SENTRY_RELEASE = (os.environ.get("DROPPR_RELEASE") or "").strip() or None
 try:
     SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("DROPPR_SENTRY_TRACES_SAMPLE_RATE", "0"))
@@ -285,6 +214,7 @@ except (TypeError, ValueError):
     SENTRY_PROFILES_SAMPLE_RATE = 0.0
 
 if SENTRY_DSN:
+
     def _sentry_before_send(event, _hint):
         if has_request_context():
             request_id = getattr(g, "request_id", None)
@@ -307,15 +237,23 @@ if SENTRY_DSN:
 DEFAULT_CACHE_TTL_SECONDS = int(os.environ.get("DROPPR_SHARE_CACHE_TTL_SECONDS", "3600"))
 MAX_CACHE_SIZE = 1000  # Max number of shares to cache
 SHARE_CACHE_WARM_ENABLED = parse_bool(os.environ.get("DROPPR_SHARE_CACHE_WARM_ENABLED", "true"))
-SHARE_CACHE_WARM_INTERVAL_SECONDS = int(os.environ.get("DROPPR_SHARE_CACHE_WARM_INTERVAL_SECONDS", "900"))
+SHARE_CACHE_WARM_INTERVAL_SECONDS = int(
+    os.environ.get("DROPPR_SHARE_CACHE_WARM_INTERVAL_SECONDS", "900")
+)
 SHARE_CACHE_WARM_LIMIT = int(os.environ.get("DROPPR_SHARE_CACHE_WARM_LIMIT", "20"))
 SHARE_CACHE_WARM_DAYS = int(os.environ.get("DROPPR_SHARE_CACHE_WARM_DAYS", "7"))
 _last_share_cache_warm_at: float = 0.0
 
 CELERY_BROKER_URL = (os.environ.get("DROPPR_CELERY_BROKER_URL") or "").strip()
-CELERY_RESULT_BACKEND = (os.environ.get("DROPPR_CELERY_RESULT_BACKEND") or "").strip() or CELERY_BROKER_URL
+CELERY_RESULT_BACKEND = (
+    os.environ.get("DROPPR_CELERY_RESULT_BACKEND") or ""
+).strip() or CELERY_BROKER_URL
 CELERY_ENABLED = bool(CELERY_BROKER_URL)
-celery_app = Celery("droppr", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND) if CELERY_ENABLED else None
+celery_app = (
+    Celery("droppr", broker=CELERY_BROKER_URL, backend=CELERY_RESULT_BACKEND)
+    if CELERY_ENABLED
+    else None
+)
 if celery_app:
     celery_app.conf.update(
         task_acks_late=True,
@@ -342,7 +280,9 @@ DROPPR_AUTH_ISSUER = os.environ.get("DROPPR_AUTH_ISSUER", "droppr")
 DROPPR_AUTH_SECRET = os.environ.get("DROPPR_AUTH_SECRET", "").strip()
 if not DROPPR_AUTH_SECRET:
     DROPPR_AUTH_SECRET = secrets.token_urlsafe(48)
-    app.logger.warning("DROPPR_AUTH_SECRET not set; generated ephemeral secret (tokens reset on restart).")
+    app.logger.warning(
+        "DROPPR_AUTH_SECRET not set; generated ephemeral secret (tokens reset on restart)."
+    )
 
 try:
     DROPPR_AUTH_ACCESS_TTL_SECONDS = int(os.environ.get("DROPPR_AUTH_ACCESS_TTL_SECONDS", "900"))
@@ -351,10 +291,14 @@ except (TypeError, ValueError):
 DROPPR_AUTH_ACCESS_TTL_SECONDS = max(60, DROPPR_AUTH_ACCESS_TTL_SECONDS)
 
 try:
-    DROPPR_AUTH_REFRESH_TTL_SECONDS = int(os.environ.get("DROPPR_AUTH_REFRESH_TTL_SECONDS", "86400"))
+    DROPPR_AUTH_REFRESH_TTL_SECONDS = int(
+        os.environ.get("DROPPR_AUTH_REFRESH_TTL_SECONDS", "86400")
+    )
 except (TypeError, ValueError):
     DROPPR_AUTH_REFRESH_TTL_SECONDS = 86400
-DROPPR_AUTH_REFRESH_TTL_SECONDS = max(DROPPR_AUTH_ACCESS_TTL_SECONDS, DROPPR_AUTH_REFRESH_TTL_SECONDS)
+DROPPR_AUTH_REFRESH_TTL_SECONDS = max(
+    DROPPR_AUTH_ACCESS_TTL_SECONDS, DROPPR_AUTH_REFRESH_TTL_SECONDS
+)
 
 try:
     ADMIN_PASSWORD_MAX_AGE_DAYS = int(os.environ.get("DROPPR_ADMIN_PASSWORD_MAX_AGE_DAYS", "90"))
@@ -377,6 +321,15 @@ if ADMIN_IP_ALLOWLIST_RAW:
 
 _refresh_tokens_lock = threading.Lock()
 _refresh_tokens: dict[str, dict] = {}
+
+_background_lock = threading.Lock()
+_background_tasks: set[str] = set()
+
+
+def _update_background_tasks_gauge():
+    if BACKGROUND_TASKS is not None:
+        BACKGROUND_TASKS.set(len(_background_tasks))
+
 
 _auth_failures_lock = threading.Lock()
 _auth_failures: dict[str, deque[float]] = {}
@@ -406,7 +359,9 @@ def _revoke_refresh_token(jti: str) -> None:
             record["revoked"] = True
 
 
-def _issue_droppr_tokens(otp_verified: bool, fb_token: str | None = None, fb_iat: int | None = None) -> dict:
+def _issue_droppr_tokens(
+    otp_verified: bool, fb_token: str | None = None, fb_iat: int | None = None
+) -> dict:
     now = int(time.time())
     access_jti = secrets.token_urlsafe(16)
     refresh_jti = secrets.token_urlsafe(24)
@@ -534,7 +489,9 @@ def _prune_failures(failures: deque[float], cutoff: float) -> None:
         failures.popleft()
 
 
-def _get_failure_count(store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock) -> int:
+def _get_failure_count(
+    store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock
+) -> int:
     now = time.time()
     with lock:
         failures = store.get(key)
@@ -547,7 +504,9 @@ def _get_failure_count(store: dict[str, deque[float]], key: str, window_seconds:
         return len(failures)
 
 
-def _record_failure(store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock) -> int:
+def _record_failure(
+    store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock
+) -> int:
     now = time.time()
     with lock:
         failures = store.get(key)
@@ -824,7 +783,9 @@ def _get_share_files(
             request_hash=request_hash, source_hash=source_hash, root=data, recursive=recursive
         )
     else:
-        files = _build_file_share_file_list(request_hash=request_hash, source_hash=source_hash, meta=data)
+        files = _build_file_share_file_list(
+            request_hash=request_hash, source_hash=source_hash, meta=data
+        )
 
     _redis_share_cache_set(
         request_hash,
@@ -879,17 +840,28 @@ configure_enqueue_task(_enqueue_task)
 
 
 if celery_app:
+
     @celery_app.task(name="droppr.transcode_fast")
-    def _celery_transcode_fast(share_hash: str, file_path: str, size: int, modified: str | None) -> None:
-        _ensure_fast_proxy_mp4(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
+    def _celery_transcode_fast(
+        share_hash: str, file_path: str, size: int, modified: str | None
+    ) -> None:
+        _ensure_fast_proxy_mp4(
+            share_hash=share_hash, file_path=file_path, size=size, modified=modified
+        )
 
     @celery_app.task(name="droppr.transcode_hd")
-    def _celery_transcode_hd(share_hash: str, file_path: str, size: int, modified: str | None) -> None:
+    def _celery_transcode_hd(
+        share_hash: str, file_path: str, size: int, modified: str | None
+    ) -> None:
         _ensure_hd_mp4(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
 
     @celery_app.task(name="droppr.transcode_hls")
-    def _celery_transcode_hls(share_hash: str, file_path: str, size: int, modified: str | None) -> None:
-        _ensure_hls_package(share_hash=share_hash, file_path=file_path, size=size, modified=modified)
+    def _celery_transcode_hls(
+        share_hash: str, file_path: str, size: int, modified: str | None
+    ) -> None:
+        _ensure_hls_package(
+            share_hash=share_hash, file_path=file_path, size=size, modified=modified
+        )
 
     @celery_app.task(name="droppr.r2_upload_file")
     def _celery_r2_upload_file(local_path: str, key: str, content_type: str | None) -> None:
@@ -917,6 +889,8 @@ app.register_blueprint(
             "fetch_public_share_json": _fetch_public_share_json,
             "filebrowser_public_dl_api": FILEBROWSER_PUBLIC_DL_API,
             "with_internal_signature": _with_internal_signature,
+            "increment_share_alias_download_count": _increment_share_alias_download_count,
+            "get_share_alias_meta": _get_share_alias_meta,
         }
     )
 )
@@ -963,11 +937,22 @@ app.register_blueprint(
             "ensure_hd_mp4": _ensure_hd_mp4,
             "hls_renditions": HLS_RENDITIONS,
             "ensure_video_meta_record": _ensure_video_meta_record,
+            "video_transcode_count": VIDEO_TRANSCODE_COUNT,
+            "video_transcode_latency": VIDEO_TRANSCODE_LATENCY,
+            "thumbnail_count": THUMBNAIL_COUNT,
         }
     )
 )
 app.register_blueprint(create_analytics_blueprint(_require_admin_access))
+app.register_blueprint(
+    create_comments_blueprint(
+        {
+            "resolve_share_hash": _resolve_share_hash,
+        }
+    )
+)
 app.register_blueprint(create_droppr_aliases_blueprint(_require_admin_access))
+
 app.register_blueprint(create_droppr_shares_blueprint(_require_admin_access))
 app.register_blueprint(
     create_droppr_requests_blueprint(

@@ -4,13 +4,15 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from flask import g, has_request_context, request
 
 LOG_FORMAT = (os.environ.get("DROPPR_LOG_FORMAT", "json") or "json").strip().lower()
 LOG_LEVEL = (os.environ.get("DROPPR_LOG_LEVEL", "INFO") or "INFO").strip().upper()
-REQUEST_ID_HEADER = (os.environ.get("DROPPR_REQUEST_ID_HEADER", "X-Request-ID") or "X-Request-ID").strip()
+REQUEST_ID_HEADER = (
+    os.environ.get("DROPPR_REQUEST_ID_HEADER", "X-Request-ID") or "X-Request-ID"
+).strip()
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,128}$")
 
 
@@ -32,7 +34,7 @@ class RequestContextFilter(logging.Filter):
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -54,8 +56,10 @@ def configure_logging(app) -> None:
     root = logging.getLogger()
     if not root.handlers:
         root.addHandler(logging.StreamHandler())
-    formatter = JsonFormatter() if LOG_FORMAT == "json" else logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"
+    formatter = (
+        JsonFormatter()
+        if LOG_FORMAT == "json"
+        else logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     )
     for handler in root.handlers:
         handler.setFormatter(formatter)

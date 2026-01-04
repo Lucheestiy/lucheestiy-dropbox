@@ -3,11 +3,22 @@ from __future__ import annotations
 import os
 from urllib.parse import quote
 
-from .filebrowser import _fetch_public_share_json
 from ..utils.validation import IMAGE_EXTS, VIDEO_EXTS, _safe_rel_path
+from .filebrowser import _fetch_public_share_json
 
 
 def _infer_gallery_type(item: dict, extension: str) -> str:
+    """
+    Infers the gallery media type (image, video, or file) based on the item's
+    metadata or file extension.
+
+    Args:
+        item: The file metadata dictionary from FileBrowser.
+        extension: The file extension (lowercase, without dot).
+
+    Returns:
+        A string: "image", "video", or "file".
+    """
     raw_type = (item.get("type") or "").strip().lower()
     if raw_type in {"image", "video"}:
         return raw_type
@@ -21,6 +32,19 @@ def _infer_gallery_type(item: dict, extension: str) -> str:
 def _build_folder_share_file_list(
     *, request_hash: str, source_hash: str, root: dict, recursive: bool
 ) -> list[dict]:
+    """
+    Constructs a list of files within a folder share, optionally scanning
+    subdirectories recursively.
+
+    Args:
+        request_hash: The public share hash used in the request.
+        source_hash: The resolved internal share hash.
+        root: The root folder metadata.
+        recursive: Whether to scan subfolders.
+
+    Returns:
+        A list of dictionaries containing file details (name, path, type, size, etc.).
+    """
     files: list[dict] = []
     dirs_to_scan: list[str] = []
     visited_dirs: set[str] = set()
@@ -85,6 +109,7 @@ def _build_folder_share_file_list(
                 "type": _infer_gallery_type(item, ext),
                 "extension": ext,
                 "size": int(item.get("size") or 0),
+                "modified": int(item.get("modified") or 0),
                 "inline_url": f"/api/public/dl/{source_hash}/{quote(rel_path, safe='/')}?inline=true",
                 "download_url": f"/api/share/{request_hash}/file/{quote(rel_path, safe='/')}?download=1",
             }
@@ -94,6 +119,17 @@ def _build_folder_share_file_list(
 
 
 def _build_file_share_file_list(*, request_hash: str, source_hash: str, meta: dict) -> list[dict]:
+    """
+    Constructs a file list for a single-file share.
+
+    Args:
+        request_hash: The public share hash used in the request.
+        source_hash: The resolved internal share hash.
+        meta: The file metadata.
+
+    Returns:
+        A list containing a single dictionary with the file details.
+    """
     raw_path = meta.get("path")
     name = meta.get("name")
     if not isinstance(name, str) or not name:
@@ -113,6 +149,7 @@ def _build_file_share_file_list(*, request_hash: str, source_hash: str, meta: di
             "type": _infer_gallery_type(meta, ext),
             "extension": ext,
             "size": int(meta.get("size") or 0),
+            "modified": int(meta.get("modified") or 0),
             "inline_url": f"/api/public/file/{source_hash}?inline=true",
             "download_url": f"/api/share/{request_hash}/download",
         }

@@ -29,6 +29,12 @@ USER_DEFAULT_PERMS = {
 
 
 class FileBrowserClient:
+    """
+    A client for interacting with the FileBrowser API.
+    Handles authentication, request signing, and provides methods for
+    managing shares, users, and resources.
+    """
+
     def __init__(
         self,
         *,
@@ -44,9 +50,11 @@ class FileBrowserClient:
         self._session = session or requests.Session()
 
     def _signed_headers(self, headers: dict, method: str, url: str) -> dict:
+        """Adds internal HMAC signatures to the request headers."""
         return self._signer(headers, method, url)
 
     def create_share(self, *, token: str, path_encoded: str, hours: int) -> dict:
+        """Creates a new public share for a given path."""
         body = {"password": "", "expires": "", "unit": "hours"}
         if hours > 0:
             body["expires"] = str(hours)
@@ -70,9 +78,15 @@ class FileBrowserClient:
         return data if isinstance(data, dict) else {}
 
     def create_user(self, *, token: str, username: str, password: str, scope: str) -> dict:
+        """Creates a new FileBrowser user with a specific scope."""
         payload = {
             "what": "user",
-            "data": {"username": username, "password": password, "scope": scope, "perm": USER_DEFAULT_PERMS},
+            "data": {
+                "username": username,
+                "password": password,
+                "scope": scope,
+                "perm": USER_DEFAULT_PERMS,
+            },
         }
         url = f"{self.base_url}/api/users"
         headers = self._signed_headers(
@@ -104,23 +118,15 @@ class FileBrowserClient:
         return data if isinstance(data, dict) else {}
 
     def fetch_shares(self, token: str) -> list[dict]:
+        """Fetches all shares managed by the user (currently disabled)."""
         # TEMPORARY FIX: Disable fetching shares to prevent FileBrowser panic (slice bounds out of range)
         # The endpoint GET /api/shares seems to crash the current FileBrowser instance.
         # TODO: Re-enable once FileBrowser is updated or the root cause is fixed.
         logger.warning("Skipping fetch_shares to prevent crash")
         return []
 
-        # Original code commented out:
-        # resp = self._session.get(self.shares_api, headers={"X-Auth": token}, timeout=10)
-        # if resp.status_code in {401, 403}:
-        #     raise PermissionError("Unauthorized")
-        # resp.raise_for_status()
-        # data = resp.json()
-        # if isinstance(data, list):
-        #     return [item for item in data if isinstance(item, dict)]
-        # return []
-
     def fetch_public_share_json(self, share_hash: str, subpath: str | None = None) -> dict | None:
+        """Fetches metadata for a public share, optionally for a subpath."""
         if subpath:
             # subpath expected to start with "/"
             subpath = "/" + subpath.lstrip("/")
@@ -137,6 +143,7 @@ class FileBrowserClient:
         return data if isinstance(data, dict) else None
 
     def fetch_resource(self, path: str, token: str) -> dict | None:
+        """Fetches metadata for a private resource."""
         safe_path = _safe_root_path(path)
         if not safe_path:
             return None
@@ -157,14 +164,20 @@ class FileBrowserClient:
 DEFAULT_FILEBROWSER_CLIENT = FileBrowserClient()
 
 
-def _create_filebrowser_share(*, token: str, path_encoded: str, hours: int, client: FileBrowserClient | None = None) -> dict:
-    return (client or DEFAULT_FILEBROWSER_CLIENT).create_share(token=token, path_encoded=path_encoded, hours=hours)
+def _create_filebrowser_share(
+    *, token: str, path_encoded: str, hours: int, client: FileBrowserClient | None = None
+) -> dict:
+    return (client or DEFAULT_FILEBROWSER_CLIENT).create_share(
+        token=token, path_encoded=path_encoded, hours=hours
+    )
 
 
 def _create_filebrowser_user(
     *, token: str, username: str, password: str, scope: str, client: FileBrowserClient | None = None
 ) -> dict:
-    return (client or DEFAULT_FILEBROWSER_CLIENT).create_user(token=token, username=username, password=password, scope=scope)
+    return (client or DEFAULT_FILEBROWSER_CLIENT).create_user(
+        token=token, username=username, password=password, scope=scope
+    )
 
 
 def _fetch_filebrowser_shares(token: str, client: FileBrowserClient | None = None) -> list[dict]:
@@ -174,8 +187,12 @@ def _fetch_filebrowser_shares(token: str, client: FileBrowserClient | None = Non
 def _fetch_public_share_json(
     share_hash: str, subpath: str | None = None, client: FileBrowserClient | None = None
 ) -> dict | None:
-    return (client or DEFAULT_FILEBROWSER_CLIENT).fetch_public_share_json(share_hash, subpath=subpath)
+    return (client or DEFAULT_FILEBROWSER_CLIENT).fetch_public_share_json(
+        share_hash, subpath=subpath
+    )
 
 
-def _fetch_filebrowser_resource(path: str, token: str, client: FileBrowserClient | None = None) -> dict | None:
+def _fetch_filebrowser_resource(
+    path: str, token: str, client: FileBrowserClient | None = None
+) -> dict | None:
     return (client or DEFAULT_FILEBROWSER_CLIENT).fetch_resource(path, token)

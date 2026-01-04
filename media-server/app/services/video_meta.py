@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import OperationalError
@@ -21,7 +21,9 @@ logger = logging.getLogger("droppr.video_meta")
 
 _VIDEO_META_ENGINE = get_video_meta_engine()
 VIDEO_META_LOCK_DIR = os.environ.get("DROPPR_VIDEO_META_LOCK_DIR", "/database/video-meta-locks")
-VIDEO_META_FFPROBE_TIMEOUT_SECONDS = int(os.environ.get("DROPPR_VIDEO_META_FFPROBE_TIMEOUT_SECONDS", "25"))
+VIDEO_META_FFPROBE_TIMEOUT_SECONDS = int(
+    os.environ.get("DROPPR_VIDEO_META_FFPROBE_TIMEOUT_SECONDS", "25")
+)
 VIDEO_META_MAX_CONCURRENCY = int(os.environ.get("DROPPR_VIDEO_META_MAX_CONCURRENCY", "2"))
 _video_meta_sema = threading.BoundedSemaphore(max(1, VIDEO_META_MAX_CONCURRENCY))
 
@@ -42,6 +44,9 @@ class _DriverConnection:
 
 @contextmanager
 def _video_meta_conn():
+    """
+    Context manager for getting a connection to the video metadata SQLite database.
+    """
     _ensure_video_meta_db()
 
     with _VIDEO_META_ENGINE.begin() as conn:
@@ -175,7 +180,7 @@ def _parse_iso8601_to_unix(value: str | None) -> int | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return int(dt.timestamp())
 
 
@@ -192,8 +197,12 @@ def _extract_ffprobe_meta(payload: dict) -> dict | None:
         streams = []
     fmt = payload.get("format") if isinstance(payload.get("format"), dict) else {}
 
-    video_stream = next((s for s in streams if isinstance(s, dict) and s.get("codec_type") == "video"), None)
-    audio_stream = next((s for s in streams if isinstance(s, dict) and s.get("codec_type") == "audio"), None)
+    video_stream = next(
+        (s for s in streams if isinstance(s, dict) and s.get("codec_type") == "video"), None
+    )
+    audio_stream = next(
+        (s for s in streams if isinstance(s, dict) and s.get("codec_type") == "audio"), None
+    )
 
     duration = _positive_float(fmt.get("duration"))
     if duration is None and isinstance(video_stream, dict):
@@ -238,7 +247,9 @@ def _extract_ffprobe_meta(payload: dict) -> dict | None:
             if rotation in {90, 270}:
                 display_width, display_height = display_height, display_width
 
-        fps = _parse_fps(video_stream.get("avg_frame_rate")) or _parse_fps(video_stream.get("r_frame_rate"))
+        fps = _parse_fps(video_stream.get("avg_frame_rate")) or _parse_fps(
+            video_stream.get("r_frame_rate")
+        )
 
         video = _strip_empty(
             {
@@ -274,6 +285,10 @@ def _extract_ffprobe_meta(payload: dict) -> dict | None:
 
 
 def _ffprobe_video_meta(src_url: str, headers: dict | None = None) -> dict | None:
+    """
+    Executes ffprobe on a video URL to extract metadata (streams, format, etc.).
+    Returns a cleaned metadata dictionary.
+    """
     cmd = ["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams"]
     if headers:
         header_lines = []
@@ -288,6 +303,7 @@ def _ffprobe_video_meta(src_url: str, headers: dict | None = None) -> dict | Non
     with _video_meta_sema:
         result = subprocess.run(
             cmd,
+            check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=VIDEO_META_FFPROBE_TIMEOUT_SECONDS,
@@ -345,7 +361,11 @@ def _needs_video_meta_refresh(
         return True
     if current_size and row["original_size"] and int(row["original_size"]) != int(current_size):
         return True
-    if current_uploaded_at and row["uploaded_at"] and int(row["uploaded_at"]) != int(current_uploaded_at):
+    if (
+        current_uploaded_at
+        and row["uploaded_at"]
+        and int(row["uploaded_at"]) != int(current_uploaded_at)
+    ):
         return True
     return False
 
@@ -405,6 +425,10 @@ def _ensure_video_meta_record(
     headers: dict | None = None,
     force: bool = False,
 ):
+    """
+    Ensures that a video metadata record exists and is up-to-date in the database.
+    If the record is missing or stale, it triggers a refresh using ffprobe.
+    """
     lock_path = _video_meta_lock_path(db_path)
     with open(lock_path, "w") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)

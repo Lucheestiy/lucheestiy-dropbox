@@ -61,8 +61,12 @@ def create_analytics_blueprint(require_admin_access):
             return error_resp
         token = auth.get("token") if auth else None
 
-        include_empty = parse_bool(request.args.get("include_empty") or request.args.get("includeEmpty") or "true")
-        include_deleted = parse_bool(request.args.get("include_deleted") or request.args.get("includeDeleted") or "true")
+        include_empty = parse_bool(
+            request.args.get("include_empty") or request.args.get("includeEmpty") or "true"
+        )
+        include_deleted = parse_bool(
+            request.args.get("include_deleted") or request.args.get("includeDeleted") or "true"
+        )
         since, until = _get_time_range()
         cache_key = f"analytics_shares:{include_empty}:{include_deleted}:{since}:{until}"
         cached = _analytics_cache_get(cache_key)
@@ -105,7 +109,9 @@ def create_analytics_blueprint(require_admin_access):
                     "downloads": int((row["file_downloads"] or 0) + (row["zip_downloads"] or 0)),
                     "unique_ips": int(row["unique_ips"] or 0),
                     "last_seen": int(row["last_seen"] or 0) if row["last_seen"] else None,
-                    "last_download_at": int(row["last_download_at"] or 0) if row["last_download_at"] else None,
+                    "last_download_at": (
+                        int(row["last_download_at"] or 0) if row["last_download_at"] else None
+                    ),
                 }
 
             total_unique_ips_row = conn.execute(
@@ -171,7 +177,9 @@ def create_analytics_blueprint(require_admin_access):
                     }
                 )
 
-        shares.sort(key=lambda s: (s.get("last_download_at") or 0, s.get("last_seen") or 0), reverse=True)
+        shares.sort(
+            key=lambda s: (s.get("last_download_at") or 0, s.get("last_seen") or 0), reverse=True
+        )
 
         payload = {
             "range": {"since": since, "until": until},
@@ -324,7 +332,7 @@ def create_analytics_blueprint(require_admin_access):
                 return ""
             value = str(value).replace('"', '""')
             if any(c in value for c in [",", "\n", "\r", '"']):
-                return f"\"{value}\""
+                return f'"{value}"'
             return value
 
         lines = ["event_type,file_path,ip,user_agent,referer,created_at"]
@@ -346,7 +354,53 @@ def create_analytics_blueprint(require_admin_access):
         return Response(
             csv_data,
             content_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="droppr-share-{share_hash}-analytics.csv"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="droppr-share-{share_hash}-analytics.csv"'
+            },
         )
+
+    @bp.route("/api/analytics/audit")
+    def analytics_audit():
+        if not ANALYTICS_ENABLED:
+            return jsonify({"error": "Analytics disabled"}), 404
+
+        error_resp, _auth = require_admin_access()
+        if error_resp:
+            return error_resp
+
+        since, until = _get_time_range()
+        limit = min(max(1, int(request.args.get("limit") or 500)), 5000)
+
+        with _analytics_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, action, target, detail, ip, user_agent, created_at
+                FROM audit_events
+                WHERE created_at >= ? AND created_at <= ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (since, until, limit),
+            ).fetchall()
+
+        events = []
+        for row in rows:
+            events.append(
+                {
+                    "id": row["id"],
+                    "action": row["action"],
+                    "target": row["target"],
+                    "detail": row["detail"],
+                    "ip": row["ip"],
+                    "user_agent": row["user_agent"],
+                    "created_at": int(row["created_at"] or 0),
+                }
+            )
+
+        resp = jsonify({"events": events, "range": {"since": since, "until": until}})
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    return bp
 
     return bp

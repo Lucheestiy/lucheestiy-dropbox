@@ -85,3 +85,39 @@ class AuthEventArchive(AnalyticsBase):
         Index("idx_auth_events_archive_ip", "ip"),
         Index("idx_auth_events_archive_event_type", "event_type"),
     )
+
+
+class AuditEvent(AnalyticsBase):
+    __tablename__ = "audit_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    action = Column(Text, nullable=False)
+    target = Column(Text)
+    detail = Column(Text)
+    ip = Column(Text)
+    user_agent = Column(Text)
+    created_at = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        Index("idx_audit_events_created_at", "created_at"),
+        Index("idx_audit_events_action", "action"),
+        Index("idx_audit_events_target", "target"),
+    )
+
+
+class AuditEventArchive(AnalyticsBase):
+    __tablename__ = "audit_events_archive"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    action = Column(Text, nullable=False)
+    target = Column(Text)
+    detail = Column(Text)
+    ip = Column(Text)
+    user_agent = Column(Text)
+    created_at = Column(Integer, nullable=False)
+    archived_at = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        Index("idx_audit_events_archive_created_at", "created_at"),
+        Index("idx_audit_events_archive_action", "action"),
+    )

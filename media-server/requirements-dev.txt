@@ -1,2 +1,8 @@
 pytest
 pytest-cov
+requests-mock
+ruff
+black
+mypy
+types-requests
+types-setuptools

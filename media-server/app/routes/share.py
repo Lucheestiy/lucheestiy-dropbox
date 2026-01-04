@@ -23,6 +23,8 @@ def create_share_blueprint(deps: dict):
     fetch_public_share_json = deps["fetch_public_share_json"]
     filebrowser_public_dl_api = deps["filebrowser_public_dl_api"]
     with_internal_signature = deps["with_internal_signature"]
+    increment_share_alias_download_count = deps["increment_share_alias_download_count"]
+    get_share_alias_meta = deps["get_share_alias_meta"]
 
     bp = Blueprint("share", __name__)
 
@@ -32,6 +34,8 @@ def create_share_blueprint(deps: dict):
             return jsonify({"error": "Invalid share hash"}), 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return jsonify({"error": "This share link has expired or reached its limit."}), 410
 
         force_refresh = parse_bool(request.args.get("refresh") or request.args.get("force"))
         max_age_param = request.args.get("max_age") or request.args.get("maxAge")
@@ -55,7 +59,12 @@ def create_share_blueprint(deps: dict):
         if files is None:
             return jsonify({"error": "Share not found"}), 404
 
-        resp = jsonify(files)
+        meta = get_share_alias_meta(share_hash)
+        allow_download = meta.get("allow_download", True) if meta else True
+
+        resp = jsonify(
+            {"files": files, "meta": {"allow_download": allow_download, "share_hash": share_hash}}
+        )
         resp.headers["Cache-Control"] = "no-store"
         log_event("gallery_view", share_hash)
         maybe_warm_share_cache()
@@ -68,6 +77,8 @@ def create_share_blueprint(deps: dict):
             return "Invalid share hash", 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return jsonify({"error": "This share link has expired or reached its limit."}), 410
 
         filename = filename or ""
         safe = safe_rel_path(filename)
@@ -76,7 +87,11 @@ def create_share_blueprint(deps: dict):
 
         is_download = parse_bool(request.args.get("download") or request.args.get("dl"))
         if is_download:
+            meta = get_share_alias_meta(share_hash)
+            if meta and not meta.get("allow_download", True):
+                return "Download is disabled for this share", 403
             log_event("file_download", share_hash, file_path=safe)
+            increment_share_alias_download_count(share_hash)
 
         encoded = requests.utils.quote(safe, safe="/")
         if is_download:
@@ -90,10 +105,17 @@ def create_share_blueprint(deps: dict):
             return "Invalid share hash", 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return jsonify({"error": "This share link has expired or reached its limit."}), 410
+
+        meta = get_share_alias_meta(share_hash)
+        if meta and not meta.get("allow_download", True):
+            return "Download is disabled for this share", 403
 
         data = fetch_public_share_json(source_hash)
         if data and not isinstance(data.get("items"), list):
             log_event("file_download", share_hash)
+            increment_share_alias_download_count(share_hash)
             inline = request.args.get("inline") or request.args.get("play")
             if inline:
                 return redirect(f"/api/public/file/{source_hash}?inline=true", code=302)
@@ -105,6 +127,7 @@ def create_share_blueprint(deps: dict):
             req = requests.get(req_url, headers=req_headers, stream=True, timeout=120)
             req.raise_for_status()
             log_event("zip_download", share_hash)
+            increment_share_alias_download_count(share_hash)
 
             headers = {}
             content_disposition = req.headers.get("Content-Disposition")

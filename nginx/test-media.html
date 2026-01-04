@@ -1,127 +1,182 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Media Test - Dropbox</title>
-    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
-    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com">
+    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com" />
     <style>
-        body { 
-            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
-            margin: 2rem; 
-            background: #1a1a1a; 
-            color: white; 
+      body {
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
+          sans-serif;
+        margin: 2rem;
+        background: #1a1a1a;
+        color: white;
+      }
+      .media-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin: 2rem 0;
+      }
+      .media-item {
+        background: #333;
+        padding: 1rem;
+        border-radius: 8px;
+      }
+      video,
+      img {
+        max-width: 100%;
+        border-radius: 4px;
+      }
+      .title {
+        color: #4caf50;
+        margin-bottom: 1rem;
+      }
+      .spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-left-color: #4caf50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 10px auto;
+      }
+      @keyframes spin {
+        100% {
+          transform: rotate(360deg);
         }
-        .media-container { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-            gap: 2rem; 
-            margin: 2rem 0; 
-        }
-        .media-item { 
-            background: #333; 
-            padding: 1rem; 
-            border-radius: 8px; 
-        }
-        video, img { 
-            max-width: 100%; 
-            border-radius: 4px; 
-        }
-        .title { 
-            color: #4CAF50; 
-            margin-bottom: 1rem; 
-        }
-        .spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #4CAF50;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 10px auto;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        .video-loader {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            padding: 1rem;
-            border-radius: 0.5rem;
-            text-align: center;
-            z-index: 10;
-            display: none;
-        }
-        .video-container {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
+      }
+      .video-loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        text-align: center;
+        z-index: 10;
+        display: none;
+      }
+      .video-container {
+        position: relative;
+        display: inline-block;
+        width: 100%;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>📹 Media Test Page</h1>
     <p>Testing direct media file access</p>
-    
+
     <div class="media-container">
-        <div class="media-item">
-            <h3 class="title">Test Image 1</h3>
-            <img src="/api/public/dl/testshare/IMG_4482.mov?inline=true" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
-            <div style="display:none; color: red;">❌ Image failed to load</div>
+      <div class="media-item">
+        <h3 class="title">Test Image 1</h3>
+        <img
+          src="/api/public/dl/testshare/IMG_4482.mov?inline=true"
+          alt="Test Image"
+          onerror="
+            this.style.display = 'none';
+            this.nextSibling.style.display = 'block';
+          "
+        />
+        <div style="display: none; color: red">❌ Image failed to load</div>
+      </div>
+
+      <div class="media-item">
+        <h3 class="title">Test Video 1</h3>
+        <div class="video-container">
+          <video
+            id="video1"
+            controls
+            preload="metadata"
+            playsinline
+            poster="/api/share/testshare/preview/IMG_4482.mov"
+          >
+            <source
+              src="/api/public/dl/testshare/IMG_4482.mov?inline=true"
+              type="video/quicktime"
+            />
+            <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/mp4" />
+            ❌ Video not supported
+          </video>
+          <div class="video-loader">
+            <div class="spinner"></div>
+            <div>Loading...</div>
+          </div>
         </div>
-        
-        <div class="media-item">
-            <h3 class="title">Test Video 1</h3>
-            <div class="video-container">
-                <video id="video1" controls preload="metadata" playsinline poster="/api/share/testshare/preview/IMG_4482.mov">
-                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/quicktime">
-                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/mp4">
-                    ❌ Video not supported
-                </video>
-                <div class="video-loader">
-                    <div class="spinner"></div>
-                    <div>Loading...</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="media-item">
-            <h3 class="title">Test Image 2 (via Share API)</h3>
-            <img src="/api/share/testshare/file/debug_red_mask.png" alt="Test Image" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
-            <div style="display:none; color: red;">❌ Image failed to load</div>
-        </div>
+      </div>
+
+      <div class="media-item">
+        <h3 class="title">Test Image 2 (via Share API)</h3>
+        <img
+          src="/api/share/testshare/file/debug_red_mask.png"
+          alt="Test Image"
+          onerror="
+            this.style.display = 'none';
+            this.nextSibling.style.display = 'block';
+          "
+        />
+        <div style="display: none; color: red">❌ Image failed to load</div>
+      </div>
     </div>
-    
+
     <h2>🔗 Test with API Paths</h2>
     <div class="media-container">
-        <div class="media-item">
-            <h3 class="title">Via Preview API - Image</h3>
-            <img src="/api/share/testshare/preview/debug_red_mask.png" alt="Test via API" onerror="this.style.display='none'; this.nextSibling.style.display='block'">
-            <div style="display:none; color: red;">❌ API image failed</div>
+      <div class="media-item">
+        <h3 class="title">Via Preview API - Image</h3>
+        <img
+          src="/api/share/testshare/preview/debug_red_mask.png"
+          alt="Test via API"
+          onerror="
+            this.style.display = 'none';
+            this.nextSibling.style.display = 'block';
+          "
+        />
+        <div style="display: none; color: red">❌ API image failed</div>
+      </div>
+
+      <div class="media-item">
+        <h3 class="title">Via Preview API - Video</h3>
+        <div class="video-container">
+          <video
+            id="video2"
+            controls
+            preload="metadata"
+            playsinline
+            poster="/api/share/testshare/preview/IMG_4482.mov"
+          >
+            <source
+              src="/api/public/dl/testshare/IMG_4482.mov?inline=true"
+              type="video/quicktime"
+            />
+            <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/mp4" />
+            ❌ API video failed
+          </video>
+          <div class="video-loader">
+            <div class="spinner"></div>
+            <div>Loading...</div>
+          </div>
         </div>
-        
-        <div class="media-item">
-            <h3 class="title">Via Preview API - Video</h3>
-            <div class="video-container">
-                <video id="video2" controls preload="metadata" playsinline poster="/api/share/testshare/preview/IMG_4482.mov">
-                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/quicktime">
-                    <source src="/api/public/dl/testshare/IMG_4482.mov?inline=true" type="video/mp4">
-                    ❌ API video failed
-                </video>
-                <div class="video-loader">
-                    <div class="spinner"></div>
-                    <div>Loading...</div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
-    
-    <script defer src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js" crossorigin="anonymous"></script>
+
+    <script
+      defer
+      src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script defer src="/static/config.js?v=2"></script>
     <script defer src="/static/sentry-init.js?v=1"></script>
     <script defer src="/static/test-media.js?v=1"></script>
     <script defer src="/static/sw-register.js?v=1"></script>
-</body>
+  </body>
 </html>

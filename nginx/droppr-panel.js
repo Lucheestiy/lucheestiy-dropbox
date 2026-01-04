@@ -68,7 +68,9 @@
 
   function isDropprDebugEnabled() {
     try {
-      return /(?:^|[?&])dropprDebug=1(?:&|$)/.test(String(window.location && window.location.search) || "");
+      return /(?:^|[?&])dropprDebug=1(?:&|$)/.test(
+        String(window.location && window.location.search) || ""
+      );
     } catch (e) {
       return false;
     }
@@ -227,7 +229,9 @@
     var style = document.createElement("style");
     style.id = SESSION_WARNING_STYLE_ID;
     style.textContent =
-      "#" + SESSION_WARNING_ID + " {\n" +
+      "#" +
+      SESSION_WARNING_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  top: 16px;\n" +
       "  right: 16px;\n" +
@@ -243,7 +247,9 @@
       "  gap: 10px;\n" +
       "  align-items: center;\n" +
       "}\n" +
-      "#" + SESSION_WARNING_ID + " .btn {\n" +
+      "#" +
+      SESSION_WARNING_ID +
+      " .btn {\n" +
       "  border: 0;\n" +
       "  background: rgba(99,102,241,0.95);\n" +
       "  color: #fff;\n" +
@@ -261,7 +267,8 @@
     if (existing) return existing;
     var el = document.createElement("div");
     el.id = SESSION_WARNING_ID;
-    el.innerHTML = '<span class="msg">Session expiring soon.</span><button class="btn" type="button">Refresh</button>';
+    el.innerHTML =
+      '<span class="msg">Session expiring soon.</span><button class="btn" type="button">Refresh</button>';
     el.querySelector(".btn").addEventListener("click", function () {
       ensureDropprAccessToken(true).then(function () {
         updateSessionWarning();
@@ -305,7 +312,11 @@
     return res.text().then(function (text) {
       var data = null;
       if (text) {
-        try { data = JSON.parse(text); } catch (e) { data = null; }
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = null;
+        }
       }
       return { res: res, data: data };
     });
@@ -336,7 +347,7 @@
 
   function refreshDropprToken(refreshToken, allowPrompt) {
     if (!refreshToken) return Promise.resolve(null);
-    var headers = { "Authorization": "Bearer " + refreshToken };
+    var headers = { Authorization: "Bearer " + refreshToken };
     var otp = getDropprOtpCode();
     if (otp) headers["X-Droppr-OTP"] = otp;
     return fetch("/api/droppr/auth/refresh", { method: "POST", headers: headers })
@@ -372,8 +383,9 @@
         return refreshDropprToken(state.refresh, true);
       }
       return loginDropprToken(true);
-    })()
-      .finally(function () { dropprAuthPromise = null; });
+    })().finally(function () {
+      dropprAuthPromise = null;
+    });
 
     return dropprAuthPromise;
   }
@@ -397,7 +409,9 @@
     var style = document.createElement("style");
     style.id = ANALYTICS_STYLE_ID;
     style.textContent =
-      "#" + ANALYTICS_BTN_ID + " {\n" +
+      "#" +
+      ANALYTICS_BTN_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  right: 18px;\n" +
       "  bottom: 18px;\n" +
@@ -417,16 +431,22 @@
       "  border: 1px solid rgba(255,255,255,0.18);\n" +
       "  user-select: none;\n" +
       "}\n" +
-      "#" + ANALYTICS_BTN_ID + ":hover {\n" +
+      "#" +
+      ANALYTICS_BTN_ID +
+      ":hover {\n" +
       "  background: rgba(79, 70, 229, 0.98);\n" +
       "  transform: translateY(-1px);\n" +
       "}\n" +
-      "#" + ANALYTICS_BTN_ID + " .icon {\n" +
+      "#" +
+      ANALYTICS_BTN_ID +
+      " .icon {\n" +
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "  display: inline-block;\n" +
       "}\n" +
-      "#" + ANALYTICS_BTN_ID + " .label {\n" +
+      "#" +
+      ANALYTICS_BTN_ID +
+      " .label {\n" +
       "  font-size: 14px;\n" +
       "  line-height: 1;\n" +
       "}\n";
@@ -466,7 +486,9 @@
     var style = document.createElement("style");
     style.id = ACCOUNTS_STYLE_ID;
     style.textContent =
-      "#" + ACCOUNTS_BTN_ID + " {\n" +
+      "#" +
+      ACCOUNTS_BTN_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  right: 18px;\n" +
       "  bottom: 66px;\n" +
@@ -487,20 +509,28 @@
       "  user-select: none;\n" +
       "  cursor: pointer;\n" +
       "}\n" +
-      "#" + ACCOUNTS_BTN_ID + ":hover {\n" +
+      "#" +
+      ACCOUNTS_BTN_ID +
+      ":hover {\n" +
       "  background: rgba(5, 150, 105, 0.98);\n" +
       "  transform: translateY(-1px);\n" +
       "}\n" +
-      "#" + ACCOUNTS_BTN_ID + " .icon {\n" +
+      "#" +
+      ACCOUNTS_BTN_ID +
+      " .icon {\n" +
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "  display: inline-block;\n" +
       "}\n" +
-      "#" + ACCOUNTS_BTN_ID + " .label {\n" +
+      "#" +
+      ACCOUNTS_BTN_ID +
+      " .label {\n" +
       "  font-size: 14px;\n" +
       "  line-height: 1;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  inset: 0;\n" +
       "  z-index: 2147483002;\n" +
@@ -510,7 +540,9 @@
       "  background: rgba(2, 6, 23, 0.6);\n" +
       "  padding: 24px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .panel {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .panel {\n" +
       "  width: 480px;\n" +
       "  max-width: calc(100vw - 48px);\n" +
       "  border-radius: 16px;\n" +
@@ -521,25 +553,33 @@
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  overflow: hidden;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .hdr {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .hdr {\n" +
       "  display: flex;\n" +
       "  align-items: flex-start;\n" +
       "  justify-content: space-between;\n" +
       "  gap: 12px;\n" +
       "  padding: 16px 18px 10px 18px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .title {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .title {\n" +
       "  font-size: 15px;\n" +
       "  font-weight: 800;\n" +
       "  line-height: 1.2;\n" +
       "  color: var(--text-primary, #fff);\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .subtitle {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .subtitle {\n" +
       "  font-size: 12px;\n" +
       "  margin-top: 6px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .close {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .close {\n" +
       "  appearance: none;\n" +
       "  border: 0;\n" +
       "  background: transparent;\n" +
@@ -550,20 +590,28 @@
       "  padding: 6px 8px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .close:hover {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .close:hover {\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .body {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .body {\n" +
       "  padding: 0 18px 18px 18px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .label {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .label {\n" +
       "  display: block;\n" +
       "  font-size: 12px;\n" +
       "  font-weight: 700;\n" +
       "  color: var(--text-primary, #e5e7eb);\n" +
       "  margin-top: 12px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " input {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " input {\n" +
       "  width: 100%;\n" +
       "  border-radius: 10px;\n" +
       "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
@@ -574,38 +622,54 @@
       "  outline: none;\n" +
       "  margin-top: 6px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " input:focus {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " input:focus {\n" +
       "  border-color: rgba(99,102,241,0.7);\n" +
       "  box-shadow: 0 0 0 3px rgba(99,102,241,0.18);\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .note {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .note {\n" +
       "  margin-top: 10px;\n" +
       "  font-size: 12px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .note span {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .note span {\n" +
       "  color: var(--text-primary, #fff);\n" +
       "  font-weight: 700;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .status {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .status {\n" +
       "  min-height: 18px;\n" +
       "  margin-top: 10px;\n" +
       "  font-size: 12px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .status.error {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .status.error {\n" +
       "  color: #fca5a5;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .status.success {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .status.success {\n" +
       "  color: #86efac;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .actions {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .actions {\n" +
       "  display: flex;\n" +
       "  justify-content: flex-end;\n" +
       "  gap: 10px;\n" +
       "  margin-top: 16px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .btn {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .btn {\n" +
       "  flex: 0 0 auto;\n" +
       "  cursor: pointer;\n" +
       "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
@@ -616,11 +680,15 @@
       "  padding: 10px 14px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .btn.secondary {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .btn.secondary {\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "  color: var(--text-primary, #fff);\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .password-meter {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .password-meter {\n" +
       "  margin-top: 10px;\n" +
       "  background: rgba(15, 23, 42, 0.65);\n" +
       "  border: 1px solid rgba(255,255,255,0.12);\n" +
@@ -629,27 +697,37 @@
       "  display: grid;\n" +
       "  gap: 6px;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .password-meter .bar {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .password-meter .bar {\n" +
       "  height: 6px;\n" +
       "  border-radius: 999px;\n" +
       "  background: rgba(255,255,255,0.12);\n" +
       "  overflow: hidden;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .password-meter .bar span {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .password-meter .bar span {\n" +
       "  display: block;\n" +
       "  height: 100%;\n" +
       "  width: 0%;\n" +
       "  background: #fca5a5;\n" +
       "  transition: width 0.2s ease;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .password-meter .label {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .password-meter .label {\n" +
       "  font-size: 12px;\n" +
       "  color: rgba(229,231,235,0.8);\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .password-meter.strong .bar span {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .password-meter.strong .bar span {\n" +
       "  background: #86efac;\n" +
       "}\n" +
-      "#" + ACCOUNTS_MODAL_ID + " .password-meter.medium .bar span {\n" +
+      "#" +
+      ACCOUNTS_MODAL_ID +
+      " .password-meter.medium .bar span {\n" +
       "  background: #fcd34d;\n" +
       "}\n";
     document.head.appendChild(style);
@@ -667,7 +745,11 @@
         return res.text().then(function (text) {
           var data = null;
           if (text) {
-            try { data = JSON.parse(text); } catch (e) { data = null; }
+            try {
+              data = JSON.parse(text);
+            } catch (e) {
+              data = null;
+            }
           }
 
           if (!res.ok) {
@@ -681,7 +763,9 @@
 
           if (data && data.root) accountsRootPath = String(data.root || "");
           if (data && data.username_pattern) {
-            try { accountsUsernameRe = new RegExp(data.username_pattern); } catch (e2) {}
+            try {
+              accountsUsernameRe = new RegExp(data.username_pattern);
+            } catch (e2) {}
           }
           if (data && data.password_min_length != null) {
             var n = parseInt(String(data.password_min_length), 10);
@@ -731,28 +815,30 @@
     panel.className = "panel";
     panel.innerHTML =
       '<div class="hdr">' +
-        '<div>' +
-          '<div class="title">Create upload account</div>' +
-          '<div class="subtitle">Each account only sees its own folder.</div>' +
-        '</div>' +
-        '<button type="button" class="close" aria-label="Close">&times;</button>' +
-      '</div>' +
+      "<div>" +
+      '<div class="title">Create upload account</div>' +
+      '<div class="subtitle">Each account only sees its own folder.</div>' +
+      "</div>" +
+      '<button type="button" class="close" aria-label="Close">&times;</button>' +
+      "</div>" +
       '<div class="body">' +
-        '<label class="label" for="droppr-account-username">Username</label>' +
-        '<input id="droppr-account-username" type="text" autocomplete="off" placeholder="letters, numbers, _ or -">' +
-        '<label class="label" for="droppr-account-password">Password</label>' +
-        '<input id="droppr-account-password" type="password" autocomplete="new-password" placeholder="at least ' + accountsPasswordMinLen + ' characters">' +
-        '<div class="password-meter" id="droppr-account-meter">' +
-          '<div class="bar"><span></span></div>' +
-          '<div class="label" id="droppr-account-meter-label">Password strength</div>' +
-        '</div>' +
-        '<div class="note">Home folder: <span id="droppr-account-scope"></span></div>' +
-        '<div class="status" id="droppr-account-status"></div>' +
-        '<div class="actions">' +
-          '<button type="button" class="btn secondary" data-action="cancel">Cancel</button>' +
-          '<button type="button" class="btn primary" data-action="create">Create</button>' +
-        '</div>' +
-      '</div>';
+      '<label class="label" for="droppr-account-username">Username</label>' +
+      '<input id="droppr-account-username" type="text" autocomplete="off" placeholder="letters, numbers, _ or -">' +
+      '<label class="label" for="droppr-account-password">Password</label>' +
+      '<input id="droppr-account-password" type="password" autocomplete="new-password" placeholder="at least ' +
+      accountsPasswordMinLen +
+      ' characters">' +
+      '<div class="password-meter" id="droppr-account-meter">' +
+      '<div class="bar"><span></span></div>' +
+      '<div class="label" id="droppr-account-meter-label">Password strength</div>' +
+      "</div>" +
+      '<div class="note">Home folder: <span id="droppr-account-scope"></span></div>' +
+      '<div class="status" id="droppr-account-status"></div>' +
+      '<div class="actions">' +
+      '<button type="button" class="btn secondary" data-action="cancel">Cancel</button>' +
+      '<button type="button" class="btn primary" data-action="create">Create</button>' +
+      "</div>" +
+      "</div>";
 
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
@@ -771,7 +857,7 @@
     function setStatus(text, tone) {
       if (!statusEl) return;
       statusEl.textContent = text || "";
-      statusEl.className = "status" + (tone ? (" " + tone) : "");
+      statusEl.className = "status" + (tone ? " " + tone : "");
     }
 
     function getPasswordRules() {
@@ -825,7 +911,9 @@
       if (rules.require_digit) checks.push({ ok: /[0-9]/.test(password), label: "digit" });
       if (rules.require_symbol) checks.push({ ok: /[^A-Za-z0-9]/.test(password), label: "symbol" });
 
-      var passed = checks.filter(function (c) { return c.ok; }).length;
+      var passed = checks.filter(function (c) {
+        return c.ok;
+      }).length;
       var total = checks.length || 1;
       var pct = Math.round((passed / total) * 100);
       meterBar.style.width = pct + "%";
@@ -881,10 +969,14 @@
           return res.text().then(function (text) {
             var data = null;
             if (text) {
-              try { data = JSON.parse(text); } catch (e) { data = null; }
+              try {
+                data = JSON.parse(text);
+              } catch (e) {
+                data = null;
+              }
             }
             if (!res.ok) {
-              var msg = (data && data.error) ? data.error : ("Request failed (" + res.status + ")");
+              var msg = data && data.error ? data.error : "Request failed (" + res.status + ")";
               throw new Error(msg);
             }
             return data || {};
@@ -894,7 +986,9 @@
           var scope = data && data.scope ? data.scope : formatAccountScope(username);
           setStatus("Account created. Folder: " + scope, "success");
           passwordInput.value = "";
-          try { usernameInput.select(); } catch (e2) {}
+          try {
+            usernameInput.select();
+          } catch (e2) {}
         })
         .catch(function (err) {
           setStatus(String(err && err.message ? err.message : err), "error");
@@ -987,7 +1081,9 @@
     var style = document.createElement("style");
     style.id = REQUEST_STYLE_ID;
     style.textContent =
-      "#" + REQUEST_BTN_ID + " {\n" +
+      "#" +
+      REQUEST_BTN_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  right: 18px;\n" +
       "  bottom: 114px;\n" +
@@ -1008,20 +1104,28 @@
       "  user-select: none;\n" +
       "  cursor: pointer;\n" +
       "}\n" +
-      "#" + REQUEST_BTN_ID + ":hover {\n" +
+      "#" +
+      REQUEST_BTN_ID +
+      ":hover {\n" +
       "  background: rgba(11, 95, 255, 0.98);\n" +
       "  transform: translateY(-1px);\n" +
       "}\n" +
-      "#" + REQUEST_BTN_ID + " .icon {\n" +
+      "#" +
+      REQUEST_BTN_ID +
+      " .icon {\n" +
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "  display: inline-block;\n" +
       "}\n" +
-      "#" + REQUEST_BTN_ID + " .label {\n" +
+      "#" +
+      REQUEST_BTN_ID +
+      " .label {\n" +
       "  font-size: 14px;\n" +
       "  line-height: 1;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  inset: 0;\n" +
       "  z-index: 2147483002;\n" +
@@ -1031,7 +1135,9 @@
       "  background: rgba(2, 6, 23, 0.6);\n" +
       "  padding: 24px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .panel {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .panel {\n" +
       "  width: 520px;\n" +
       "  max-width: calc(100vw - 48px);\n" +
       "  border-radius: 16px;\n" +
@@ -1042,25 +1148,33 @@
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  overflow: hidden;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .hdr {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .hdr {\n" +
       "  display: flex;\n" +
       "  align-items: flex-start;\n" +
       "  justify-content: space-between;\n" +
       "  gap: 12px;\n" +
       "  padding: 16px 18px 10px 18px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .title {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .title {\n" +
       "  font-size: 15px;\n" +
       "  font-weight: 800;\n" +
       "  line-height: 1.2;\n" +
       "  color: var(--text-primary, #fff);\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .subtitle {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .subtitle {\n" +
       "  font-size: 12px;\n" +
       "  margin-top: 6px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .close {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .close {\n" +
       "  appearance: none;\n" +
       "  border: 0;\n" +
       "  background: transparent;\n" +
@@ -1071,20 +1185,28 @@
       "  padding: 6px 8px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .close:hover {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .close:hover {\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .body {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .body {\n" +
       "  padding: 0 18px 18px 18px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .label {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .label {\n" +
       "  display: block;\n" +
       "  font-size: 12px;\n" +
       "  font-weight: 700;\n" +
       "  color: var(--text-primary, #e5e7eb);\n" +
       "  margin-top: 12px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " input {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " input {\n" +
       "  width: 100%;\n" +
       "  border-radius: 10px;\n" +
       "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
@@ -1095,35 +1217,51 @@
       "  outline: none;\n" +
       "  margin-top: 6px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " input:focus {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " input:focus {\n" +
       "  border-color: rgba(59,130,246,0.7);\n" +
       "  box-shadow: 0 0 0 3px rgba(59,130,246,0.18);\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .row {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .row {\n" +
       "  display: flex;\n" +
       "  align-items: center;\n" +
       "  justify-content: space-between;\n" +
       "  gap: 12px;\n" +
       "  margin-top: 12px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .row .label {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .row .label {\n" +
       "  margin-top: 0;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .password-wrap {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .password-wrap {\n" +
       "  display: none;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .password-wrap.show {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .password-wrap.show {\n" +
       "  display: block;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .switch {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .switch {\n" +
       "  position: relative;\n" +
       "  width: 44px;\n" +
       "  height: 24px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .switch input {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .switch input {\n" +
       "  display: none;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .slider {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .slider {\n" +
       "  position: absolute;\n" +
       "  cursor: pointer;\n" +
       "  inset: 0;\n" +
@@ -1131,8 +1269,10 @@
       "  border-radius: 999px;\n" +
       "  transition: background 0.2s ease;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .slider:before {\n" +
-      "  content: \"\";\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .slider:before {\n" +
+      '  content: "";\n' +
       "  position: absolute;\n" +
       "  height: 18px;\n" +
       "  width: 18px;\n" +
@@ -1142,47 +1282,69 @@
       "  border-radius: 50%;\n" +
       "  transition: transform 0.2s ease;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .switch input:checked + .slider {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .switch input:checked + .slider {\n" +
       "  background: rgba(59,130,246,0.9);\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .switch input:checked + .slider:before {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .switch input:checked + .slider:before {\n" +
       "  transform: translateX(20px);\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .status {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .status {\n" +
       "  min-height: 18px;\n" +
       "  margin-top: 10px;\n" +
       "  font-size: 12px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .status.error {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .status.error {\n" +
       "  color: #fca5a5;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .status.success {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .status.success {\n" +
       "  color: #93c5fd;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .result {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .result {\n" +
       "  display: none;\n" +
       "  margin-top: 12px;\n" +
       "  gap: 8px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .result.show {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .result.show {\n" +
       "  display: grid;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .link-row {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .link-row {\n" +
       "  display: grid;\n" +
       "  grid-template-columns: 1fr auto auto;\n" +
       "  gap: 8px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .link-row input {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .link-row input {\n" +
       "  margin-top: 0;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .actions {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .actions {\n" +
       "  display: flex;\n" +
       "  justify-content: flex-end;\n" +
       "  gap: 10px;\n" +
       "  margin-top: 16px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .btn {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .btn {\n" +
       "  flex: 0 0 auto;\n" +
       "  cursor: pointer;\n" +
       "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
@@ -1193,7 +1355,9 @@
       "  padding: 10px 14px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + REQUEST_MODAL_ID + " .btn.secondary {\n" +
+      "#" +
+      REQUEST_MODAL_ID +
+      " .btn.secondary {\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "  color: var(--text-primary, #fff);\n" +
       "}\n";
@@ -1212,41 +1376,41 @@
     panel.className = "panel";
     panel.innerHTML =
       '<div class="hdr">' +
-        '<div>' +
-          '<div class="title">Create file request</div>' +
-          '<div class="subtitle">Recipients can upload without seeing other files.</div>' +
-        '</div>' +
-        '<button type="button" class="close" aria-label="Close">&times;</button>' +
-      '</div>' +
+      "<div>" +
+      '<div class="title">Create file request</div>' +
+      '<div class="subtitle">Recipients can upload without seeing other files.</div>' +
+      "</div>" +
+      '<button type="button" class="close" aria-label="Close">&times;</button>' +
+      "</div>" +
       '<div class="body">' +
-        '<label class="label" for="droppr-request-path">Folder path</label>' +
-        '<input id="droppr-request-path" type="text" autocomplete="off" placeholder="/uploads/team-a">' +
-        '<label class="label" for="droppr-request-expire">Expires in hours (0 = never)</label>' +
-        '<input id="droppr-request-expire" type="number" min="0" step="1" inputmode="numeric">' +
-        '<div class="row">' +
-          '<span class="label">Password protection</span>' +
-          '<label class="switch">' +
-            '<input id="droppr-request-password-toggle" type="checkbox">' +
-            '<span class="slider"></span>' +
-          '</label>' +
-        '</div>' +
-        '<div class="password-wrap" id="droppr-request-password-wrap">' +
-          '<input id="droppr-request-password" type="password" autocomplete="new-password" placeholder="Optional password">' +
-        '</div>' +
-        '<div class="status" id="droppr-request-status"></div>' +
-        '<div class="result" id="droppr-request-result">' +
-          '<div class="label">Request link</div>' +
-          '<div class="link-row">' +
-            '<input id="droppr-request-link" type="text" readonly>' +
-            '<button type="button" class="btn secondary" data-action="copy">Copy</button>' +
-            '<button type="button" class="btn secondary" data-action="open">Open</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="actions">' +
-          '<button type="button" class="btn secondary" data-action="cancel">Cancel</button>' +
-          '<button type="button" class="btn primary" data-action="create">Create link</button>' +
-        '</div>' +
-      '</div>';
+      '<label class="label" for="droppr-request-path">Folder path</label>' +
+      '<input id="droppr-request-path" type="text" autocomplete="off" placeholder="/uploads/team-a">' +
+      '<label class="label" for="droppr-request-expire">Expires in hours (0 = never)</label>' +
+      '<input id="droppr-request-expire" type="number" min="0" step="1" inputmode="numeric">' +
+      '<div class="row">' +
+      '<span class="label">Password protection</span>' +
+      '<label class="switch">' +
+      '<input id="droppr-request-password-toggle" type="checkbox">' +
+      '<span class="slider"></span>' +
+      "</label>" +
+      "</div>" +
+      '<div class="password-wrap" id="droppr-request-password-wrap">' +
+      '<input id="droppr-request-password" type="password" autocomplete="new-password" placeholder="Optional password">' +
+      "</div>" +
+      '<div class="status" id="droppr-request-status"></div>' +
+      '<div class="result" id="droppr-request-result">' +
+      '<div class="label">Request link</div>' +
+      '<div class="link-row">' +
+      '<input id="droppr-request-link" type="text" readonly>' +
+      '<button type="button" class="btn secondary" data-action="copy">Copy</button>' +
+      '<button type="button" class="btn secondary" data-action="open">Open</button>' +
+      "</div>" +
+      "</div>" +
+      '<div class="actions">' +
+      '<button type="button" class="btn secondary" data-action="cancel">Cancel</button>' +
+      '<button type="button" class="btn primary" data-action="create">Create link</button>' +
+      "</div>" +
+      "</div>";
 
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
@@ -1268,7 +1432,7 @@
     function setStatus(text, tone) {
       if (!statusEl) return;
       statusEl.textContent = text || "";
-      statusEl.className = "status" + (tone ? (" " + tone) : "");
+      statusEl.className = "status" + (tone ? " " + tone : "");
     }
 
     function setResult(link) {
@@ -1335,17 +1499,21 @@
           return res.text().then(function (text) {
             var data = null;
             if (text) {
-              try { data = JSON.parse(text); } catch (e) { data = null; }
+              try {
+                data = JSON.parse(text);
+              } catch (e) {
+                data = null;
+              }
             }
             if (!res.ok) {
-              var msg = (data && data.error) ? data.error : ("Request failed (" + res.status + ")");
+              var msg = data && data.error ? data.error : "Request failed (" + res.status + ")";
               throw new Error(msg);
             }
             return data || {};
           });
         })
         .then(function (data) {
-          var url = data && data.url ? data.url : ("/request/" + (data.hash || ""));
+          var url = data && data.url ? data.url : "/request/" + (data.hash || "");
           var link = window.location.origin + url;
           setStatus("Request link ready.", "success");
           setResult(link);
@@ -1363,11 +1531,14 @@
       if (!linkInput || !linkInput.value) return;
       var link = linkInput.value;
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(link).then(function () {
-          setStatus("Link copied to clipboard.", "success");
-        }).catch(function () {
-          setStatus("Copy failed. You can copy manually.", "error");
-        });
+        navigator.clipboard
+          .writeText(link)
+          .then(function () {
+            setStatus("Link copied to clipboard.", "success");
+          })
+          .catch(function () {
+            setStatus("Copy failed. You can copy manually.", "error");
+          });
       } else {
         try {
           linkInput.select();
@@ -1400,7 +1571,10 @@
 
     updateToggle();
     if (toggleInput) toggleInput.addEventListener("change", updateToggle);
-    if (passwordInput) passwordInput.addEventListener("input", function () { setStatus("", ""); });
+    if (passwordInput)
+      passwordInput.addEventListener("input", function () {
+        setStatus("", "");
+      });
     if (closeBtn) closeBtn.addEventListener("click", closeModal);
     if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
     if (createBtn) createBtn.addEventListener("click", submit);
@@ -1478,7 +1652,9 @@
     var style = document.createElement("style");
     style.id = STREAM_BTN_STYLE_ID;
     style.textContent =
-      "#" + STREAM_BTN_ID + " {\n" +
+      "#" +
+      STREAM_BTN_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  bottom: 76px;\n" +
       "  right: 16px;\n" +
@@ -1498,16 +1674,22 @@
       "  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);\n" +
       "  transition: all 0.2s ease;\n" +
       "}\n" +
-      "#" + STREAM_BTN_ID + ":hover {\n" +
+      "#" +
+      STREAM_BTN_ID +
+      ":hover {\n" +
       "  background: #818cf8;\n" +
       "  transform: translateY(-2px);\n" +
       "  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);\n" +
       "}\n" +
-      "#" + STREAM_BTN_ID + " .icon {\n" +
+      "#" +
+      STREAM_BTN_ID +
+      " .icon {\n" +
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "}\n" +
-      "#" + STREAM_BTN_ID + " .label {\n" +
+      "#" +
+      STREAM_BTN_ID +
+      " .label {\n" +
       "  line-height: 1;\n" +
       "}\n";
     document.head.appendChild(style);
@@ -1528,7 +1710,7 @@
   function ensureStreamButton() {
     var existing = document.getElementById(STREAM_BTN_ID);
     var shareHash = getShareHashFromUrl();
-    
+
     // Only show on gallery pages with a share hash
     if (!shareHash) {
       if (existing && existing.parentNode) {
@@ -1641,16 +1823,24 @@
     style.id = styleId;
     style.textContent =
       "input::placeholder, input::-webkit-input-placeholder { " +
-      "  color: " + placeholderColor + " !important; " +
+      "  color: " +
+      placeholderColor +
+      " !important; " +
       "  opacity: 1 !important; " +
-      "  -webkit-text-fill-color: " + placeholderColor + " !important; " +
+      "  -webkit-text-fill-color: " +
+      placeholderColor +
+      " !important; " +
       "} " +
       "input::-moz-placeholder { " +
-      "  color: " + placeholderColor + " !important; " +
+      "  color: " +
+      placeholderColor +
+      " !important; " +
       "  opacity: 1 !important; " +
       "} " +
       "input:-ms-input-placeholder { " +
-      "  color: " + placeholderColor + " !important; " +
+      "  color: " +
+      placeholderColor +
+      " !important; " +
       "} ";
     document.head.appendChild(style);
   }
@@ -1688,10 +1878,14 @@
       "touch-action:manipulation;user-select:none;";
 
     // Use click event - works on iOS when button has proper touch-action
-    btn.addEventListener("click", function(e) {
-      e.preventDefault();
-      toggleTheme();
-    }, false);
+    btn.addEventListener(
+      "click",
+      function (e) {
+        e.preventDefault();
+        toggleTheme();
+      },
+      false
+    );
 
     document.body.appendChild(btn);
 
@@ -1705,7 +1899,9 @@
     var style = document.createElement("style");
     style.id = VIDEO_META_STYLE_ID;
     style.textContent =
-      "#" + VIDEO_META_PANEL_ID + " {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  right: 18px;\n" +
       "  bottom: 74px;\n" +
@@ -1720,18 +1916,24 @@
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  display: none;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .hdr {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .hdr {\n" +
       "  display: flex;\n" +
       "  align-items: center;\n" +
       "  justify-content: space-between;\n" +
       "  gap: 10px;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .title {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .title {\n" +
       "  font-weight: 800;\n" +
       "  font-size: 13px;\n" +
       "  letter-spacing: -0.01em;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .close {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .close {\n" +
       "  appearance: none;\n" +
       "  border: 1px solid var(--droppr-overlay-border, rgba(255,255,255,0.2));\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
@@ -1742,34 +1944,46 @@
       "  cursor: pointer;\n" +
       "  font-weight: 800;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .path {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .path {\n" +
       "  margin-top: 6px;\n" +
       "  font-size: 12px;\n" +
       "  opacity: 0.82;\n" +
       "  word-break: break-word;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .grid {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .grid {\n" +
       "  margin-top: 10px;\n" +
       "  display: grid;\n" +
       "  gap: 7px;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .row {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .row {\n" +
       "  display: flex;\n" +
       "  align-items: baseline;\n" +
       "  justify-content: space-between;\n" +
       "  gap: 12px;\n" +
       "  font-size: 12px;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .k {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .k {\n" +
       "  opacity: 0.78;\n" +
       "  white-space: nowrap;\n" +
       "}\n" +
-      "#" + VIDEO_META_PANEL_ID + " .v {\n" +
+      "#" +
+      VIDEO_META_PANEL_ID +
+      " .v {\n" +
       "  text-align: right;\n" +
       "  overflow: hidden;\n" +
       "  text-overflow: ellipsis;\n" +
       "}\n" +
-      "#" + VIDEO_META_INLINE_ID + " {\n" +
+      "#" +
+      VIDEO_META_INLINE_ID +
+      " {\n" +
       "  margin-top: 10px;\n" +
       "  padding: 10px 12px;\n" +
       "  border-radius: 12px;\n" +
@@ -1781,17 +1995,23 @@
       "  font-size: 12px;\n" +
       "  line-height: 1.35;\n" +
       "}\n" +
-      "#" + VIDEO_META_INLINE_ID + " .line {\n" +
+      "#" +
+      VIDEO_META_INLINE_ID +
+      " .line {\n" +
       "  display: block;\n" +
       "  opacity: 0.95;\n" +
       "  white-space: nowrap;\n" +
       "  overflow: hidden;\n" +
       "  text-overflow: ellipsis;\n" +
       "}\n" +
-      "#" + VIDEO_META_INLINE_ID + " .muted {\n" +
+      "#" +
+      VIDEO_META_INLINE_ID +
+      " .muted {\n" +
       "  opacity: 0.75;\n" +
       "}\n" +
-      "." + VIDEO_ROW_DETAILS_CLASS + " {\n" +
+      "." +
+      VIDEO_ROW_DETAILS_CLASS +
+      " {\n" +
       "  margin-top: 6px;\n" +
       "  padding: 8px 10px;\n" +
       "  border-radius: 12px;\n" +
@@ -1806,21 +2026,29 @@
       "  user-select: text;\n" +
       "  cursor: text;\n" +
       "}\n" +
-      "." + VIDEO_ROW_DETAILS_CLASS + " .line {\n" +
+      "." +
+      VIDEO_ROW_DETAILS_CLASS +
+      " .line {\n" +
       "  display: block;\n" +
       "  color: var(--droppr-overlay-text, rgba(248, 250, 252, 0.98)) !important;\n" +
       "  white-space: normal;\n" +
       "  overflow-wrap: anywhere;\n" +
       "  word-break: break-word;\n" +
       "}\n" +
-      "." + VIDEO_ROW_DETAILS_CLASS + " .muted {\n" +
+      "." +
+      VIDEO_ROW_DETAILS_CLASS +
+      " .muted {\n" +
       "  opacity: 0.88;\n" +
       "  color: var(--droppr-overlay-muted, rgba(203, 213, 225, 0.96)) !important;\n" +
       "}\n" +
-      "." + VIDEO_DETAILS_ROW_CLASS + " {\n" +
+      "." +
+      VIDEO_DETAILS_ROW_CLASS +
+      " {\n" +
       "  user-select: text;\n" +
       "}\n" +
-      "#listing:not(.list) ." + VIDEO_ROW_DETAILS_CLASS + " {\n" +
+      "#listing:not(.list) ." +
+      VIDEO_ROW_DETAILS_CLASS +
+      " {\n" +
       "  position: static;\n" +
       "  margin-top: 4px;\n" +
       "  padding: 6px 8px;\n" +
@@ -1839,12 +2067,16 @@
     var style = document.createElement("style");
     style.id = VIDEO_THUMB_STYLE_ID;
     style.textContent =
-      "." + VIDEO_THUMB_WRAP_CLASS + " {\n" +
+      "." +
+      VIDEO_THUMB_WRAP_CLASS +
+      " {\n" +
       "  position: relative;\n" +
       "  overflow: hidden;\n" +
       "  border-radius: 6px;\n" +
       "}\n" +
-      "." + VIDEO_THUMB_CLASS + " {\n" +
+      "." +
+      VIDEO_THUMB_CLASS +
+      " {\n" +
       "  position: absolute;\n" +
       "  inset: 0;\n" +
       "  width: 100%;\n" +
@@ -1853,7 +2085,9 @@
       "  border-radius: inherit;\n" +
       "  display: block;\n" +
       "}\n" +
-      "." + VIDEO_THUMB_HIDE_CLASS + " {\n" +
+      "." +
+      VIDEO_THUMB_HIDE_CLASS +
+      " {\n" +
       "  opacity: 0 !important;\n" +
       "}\n";
     document.head.appendChild(style);
@@ -1958,13 +2192,14 @@
 
     var vcodec = v.codec ? String(v.codec).toUpperCase() : "";
     var acodec = a.codec ? String(a.codec).toUpperCase() : "";
-    var codecs = vcodec ? (acodec ? vcodec + "/" + acodec : vcodec) : (acodec || "");
+    var codecs = vcodec ? (acodec ? vcodec + "/" + acodec : vcodec) : acodec || "";
 
     var dur = Number(meta.duration);
     var durText = Number.isFinite(dur) && dur > 0 ? formatDuration(dur) : "";
 
     var fps = Number(v.fps);
-    var fpsText = Number.isFinite(fps) && fps > 0 ? String(Math.round(fps * 100) / 100) + "fps" : "";
+    var fpsText =
+      Number.isFinite(fps) && fps > 0 ? String(Math.round(fps * 100) / 100) + "fps" : "";
 
     var out = [];
     if (size) out.push(formatBytes(size));
@@ -2004,7 +2239,9 @@
   function isLikelyFileIcon(el) {
     if (!el) return false;
     var cls = String(el.className || "");
-    var txt = String(el.textContent || "").trim().toLowerCase();
+    var txt = String(el.textContent || "")
+      .trim()
+      .toLowerCase();
     if (/checkbox|check|menu|share|download|delete|more/.test(cls)) return false;
     if (/checkbox|check|menu|share|download|delete|more/.test(txt)) return false;
     if (/mdi-file|mdi-video|mdi-movie|mdi-film|mdi-play/i.test(cls)) return true;
@@ -2087,13 +2324,19 @@
       img.decoding = "async";
       img.addEventListener("error", function () {
         if (img.dataset) img.dataset.failed = "1";
-        try { img.style.display = "none"; } catch (e2) {}
-        try { if (iconEl && iconEl.classList) iconEl.classList.remove(VIDEO_THUMB_HIDE_CLASS); } catch (e3) {}
+        try {
+          img.style.display = "none";
+        } catch (e2) {}
+        try {
+          if (iconEl && iconEl.classList) iconEl.classList.remove(VIDEO_THUMB_HIDE_CLASS);
+        } catch (e3) {}
       });
       try {
         container.insertBefore(img, container.firstChild);
       } catch (e4) {
-        try { container.appendChild(img); } catch (e5) {}
+        try {
+          container.appendChild(img);
+        } catch (e5) {}
       }
     }
 
@@ -2138,7 +2381,7 @@
     if (!n) return null;
     n = n.replace(/^\/+/, "");
 
-    var combined = d === "/" ? ("/" + n) : (d + "/" + n);
+    var combined = d === "/" ? "/" + n : d + "/" + n;
     return normalizePathEncoded(combined);
   }
 
@@ -2177,7 +2420,8 @@
   }
 
   function getSelectedFilesRowEl() {
-    var listing = document.getElementById("listing") || document.getElementById("app") || document.body;
+    var listing =
+      document.getElementById("listing") || document.getElementById("app") || document.body;
     if (!listing || !listing.querySelector) return null;
 
     return (
@@ -2306,7 +2550,8 @@
       if (nameText && txt.indexOf(nameText) !== -1) continue;
 
       var lower = txt.toLowerCase();
-      var looksLikeAgo = lower.indexOf(" ago") !== -1 || lower.endsWith("ago") || lower.indexOf("yesterday") !== -1;
+      var looksLikeAgo =
+        lower.indexOf(" ago") !== -1 || lower.endsWith("ago") || lower.indexOf("yesterday") !== -1;
       var looksLikeSize = /\b\d+(?:\.\d+)?\s*(?:b|kb|mb|gb|tb|kib|mib|gib|tib)\b/.test(lower);
       if (!looksLikeAgo && !looksLikeSize) continue;
 
@@ -2328,7 +2573,9 @@
     if (layout !== "list") {
       var existingInline = null;
       try {
-        existingInline = rowEl.querySelector ? rowEl.querySelector("." + VIDEO_ROW_DETAILS_CLASS) : null;
+        existingInline = rowEl.querySelector
+          ? rowEl.querySelector("." + VIDEO_ROW_DETAILS_CLASS)
+          : null;
       } catch (eInline) {
         existingInline = null;
       }
@@ -2357,15 +2604,21 @@
       inlineBox.addEventListener(
         "click",
         function (e) {
-          try { e.preventDefault(); } catch (e1) {}
-          try { e.stopPropagation(); } catch (e2) {}
+          try {
+            e.preventDefault();
+          } catch (e1) {}
+          try {
+            e.stopPropagation();
+          } catch (e2) {}
         },
         true
       );
       inlineBox.addEventListener(
         "mousedown",
         function (e) {
-          try { e.stopPropagation(); } catch (e3) {}
+          try {
+            e.stopPropagation();
+          } catch (e3) {}
         },
         true
       );
@@ -2466,13 +2719,15 @@
       var originalSummary = renderMetaSummary(data.original, data.original_size);
       var processedSummary = renderMetaSummary(data.processed, data.processed_size);
 
-      if (originalSummary && originalSummary !== "—") out.push({ text: "Original: " + originalSummary });
+      if (originalSummary && originalSummary !== "—")
+        out.push({ text: "Original: " + originalSummary });
       if (processedSummary && processedSummary !== "—") {
         var action = data.action ? actionLabel(data.action) : "";
-        out.push({ text: "After: " + processedSummary + (action ? (" • " + action) : "") });
+        out.push({ text: "After: " + processedSummary + (action ? " • " + action : "") });
       }
 
-      if (out.length === 0 && data.status) out.push({ text: "Status: " + String(data.status), muted: true });
+      if (out.length === 0 && data.status)
+        out.push({ text: "Status: " + String(data.status), muted: true });
     }
 
     if (out.length === 0) out.push({ text: "No video metadata recorded", muted: true });
@@ -2491,18 +2746,24 @@
     var originalSummary = renderMetaSummary(original, originalSize);
     var processedSummary = renderMetaSummary(processed, processedSize);
 
-    var origSizeText = Number.isFinite(originalSize) && originalSize > 0 ? formatBytes(originalSize) : "";
-    var procSizeText = Number.isFinite(processedSize) && processedSize > 0 ? formatBytes(processedSize) : "";
+    var origSizeText =
+      Number.isFinite(originalSize) && originalSize > 0 ? formatBytes(originalSize) : "";
+    var procSizeText =
+      Number.isFinite(processedSize) && processedSize > 0 ? formatBytes(processedSize) : "";
 
-    var origVideo = original && original.video && typeof original.video === "object" ? original.video : {};
-    var origAudio = original && original.audio && typeof original.audio === "object" ? original.audio : {};
-    var procVideo = processed && processed.video && typeof processed.video === "object" ? processed.video : {};
-    var procAudio = processed && processed.audio && typeof processed.audio === "object" ? processed.audio : {};
+    var origVideo =
+      original && original.video && typeof original.video === "object" ? original.video : {};
+    var origAudio =
+      original && original.audio && typeof original.audio === "object" ? original.audio : {};
+    var procVideo =
+      processed && processed.video && typeof processed.video === "object" ? processed.video : {};
+    var procAudio =
+      processed && processed.audio && typeof processed.audio === "object" ? processed.audio : {};
 
     function codecPair(video, audio) {
       var v = video && video.codec ? String(video.codec).toUpperCase() : "";
       var a = audio && audio.codec ? String(audio.codec).toUpperCase() : "";
-      if (v) return a ? (v + "/" + a) : v;
+      if (v) return a ? v + "/" + a : v;
       return a || "";
     }
 
@@ -2510,27 +2771,40 @@
     var procCodecs = codecPair(procVideo, procAudio);
 
     function resolution(video) {
-      var w = parseInt(String(video && (video.display_width || video.width || "") || ""), 10);
-      var h = parseInt(String(video && (video.display_height || video.height || "") || ""), 10);
+      var w = parseInt(String((video && (video.display_width || video.width || "")) || ""), 10);
+      var h = parseInt(String((video && (video.display_height || video.height || "")) || ""), 10);
       return !isNaN(w) && !isNaN(h) && w > 0 && h > 0 ? w + "×" + h : "";
     }
 
     var res = resolution(procVideo) || resolution(origVideo);
-    var dur = Number(processed && processed.duration != null ? processed.duration : (original && original.duration != null ? original.duration : NaN));
+    var dur = Number(
+      processed && processed.duration != null
+        ? processed.duration
+        : original && original.duration != null
+          ? original.duration
+          : NaN
+    );
     var durText = Number.isFinite(dur) && dur > 0 ? formatDuration(dur) : "";
 
-    var fps = Number(procVideo && procVideo.fps != null ? procVideo.fps : (origVideo && origVideo.fps != null ? origVideo.fps : NaN));
-    var fpsText = Number.isFinite(fps) && fps > 0 ? String(Math.round(fps * 100) / 100) + "fps" : "";
+    var fps = Number(
+      procVideo && procVideo.fps != null
+        ? procVideo.fps
+        : origVideo && origVideo.fps != null
+          ? origVideo.fps
+          : NaN
+    );
+    var fpsText =
+      Number.isFinite(fps) && fps > 0 ? String(Math.round(fps * 100) / 100) + "fps" : "";
 
     var sizePart = "";
     if (origSizeText && procSizeText) {
-      sizePart = origSizeText === procSizeText ? procSizeText : (origSizeText + " → " + procSizeText);
+      sizePart = origSizeText === procSizeText ? procSizeText : origSizeText + " → " + procSizeText;
     } else if (procSizeText) sizePart = procSizeText;
     else if (origSizeText) sizePart = origSizeText;
 
     var codecPart = "";
     if (origCodecs && procCodecs) {
-      codecPart = origCodecs === procCodecs ? procCodecs : (origCodecs + " → " + procCodecs);
+      codecPart = origCodecs === procCodecs ? procCodecs : origCodecs + " → " + procCodecs;
     } else codecPart = procCodecs || origCodecs;
 
     var action = data.action ? actionLabel(data.action) : "";
@@ -2564,7 +2838,8 @@
 
     if (lines.length === 0) {
       if (processedSummary && processedSummary !== "—") lines.push("After: " + processedSummary);
-      else if (originalSummary && originalSummary !== "—") lines.push("Original: " + originalSummary);
+      else if (originalSummary && originalSummary !== "—")
+        lines.push("Original: " + originalSummary);
     }
 
     if (lines.length > 2) lines = lines.slice(0, 2);
@@ -2580,7 +2855,8 @@
         if (compactLines[i]) out.push({ text: compactLines[i] });
       }
 
-      if (out.length === 0 && data.status) out.push({ text: "Status: " + String(data.status), muted: true });
+      if (out.length === 0 && data.status)
+        out.push({ text: "Status: " + String(data.status), muted: true });
     }
 
     if (out.length === 0) out.push({ text: "No video metadata recorded", muted: true });
@@ -2606,10 +2882,12 @@
     ensureVideoThumbStyles();
 
     var layout = getFilesListingLayout();
-    var root = document.getElementById("listing") || document.getElementById("app") || document.body;
-    var rows = root && root.querySelectorAll
-      ? root.querySelectorAll(".row.list-item, .v-list-item, tr, .item, .file")
-      : document.querySelectorAll(".row.list-item, .v-list-item, tr, .item, .file");
+    var root =
+      document.getElementById("listing") || document.getElementById("app") || document.body;
+    var rows =
+      root && root.querySelectorAll
+        ? root.querySelectorAll(".row.list-item, .v-list-item, tr, .item, .file")
+        : document.querySelectorAll(".row.list-item, .v-list-item, tr, .item, .file");
     var maxScanRows = 250;
     var maxNewFetches = 8;
     var scanned = 0;
@@ -2654,7 +2932,10 @@
         box.dataset.includeName = includeName ? "1" : "";
         box.dataset.loaded = "";
         var initialLines = includeName
-          ? [{ text: nameText, muted: true }, { text: "Loading video details…", muted: true }]
+          ? [
+              { text: nameText, muted: true },
+              { text: "Loading video details…", muted: true },
+            ]
           : [{ text: "Loading video details…", muted: true }];
         renderLinesIntoBox(box, initialLines);
       }
@@ -2678,16 +2959,30 @@
       (function (path, el) {
         fetchVideoMeta(path)
           .then(function (data) {
-            videoMetaCache[path] = (data && typeof data === "object") ? data : null;
+            videoMetaCache[path] = data && typeof data === "object" ? data : null;
             if (el && el.dataset && el.dataset.path === path) {
-              renderLinesIntoBox(el, getVideoMetaLinesForItem(el.dataset.name || "", data, el.dataset.includeName === "1"));
+              renderLinesIntoBox(
+                el,
+                getVideoMetaLinesForItem(
+                  el.dataset.name || "",
+                  data,
+                  el.dataset.includeName === "1"
+                )
+              );
               el.dataset.loaded = "1";
             }
           })
           .catch(function () {
             videoMetaCache[path] = null;
             if (el && el.dataset && el.dataset.path === path) {
-              renderLinesIntoBox(el, getVideoMetaLinesForItem(el.dataset.name || "", null, el.dataset.includeName === "1"));
+              renderLinesIntoBox(
+                el,
+                getVideoMetaLinesForItem(
+                  el.dataset.name || "",
+                  null,
+                  el.dataset.includeName === "1"
+                )
+              );
               el.dataset.loaded = "1";
             }
           })
@@ -2744,7 +3039,8 @@
 
   function findActiveVideoElement() {
     var sourceEl = document.querySelector('video source[src*=\"/api/raw/\"]');
-    if (sourceEl && sourceEl.parentElement && sourceEl.parentElement.tagName === "VIDEO") return sourceEl.parentElement;
+    if (sourceEl && sourceEl.parentElement && sourceEl.parentElement.tagName === "VIDEO")
+      return sourceEl.parentElement;
     var videoEl = document.querySelector('video[src*=\"/api/raw/\"]');
     return videoEl || null;
   }
@@ -2755,7 +3051,9 @@
     ensureVideoMetaStyles();
 
     try {
-      var existing = videoEl.parentNode ? videoEl.parentNode.querySelector("#" + VIDEO_META_INLINE_ID) : null;
+      var existing = videoEl.parentNode
+        ? videoEl.parentNode.querySelector("#" + VIDEO_META_INLINE_ID)
+        : null;
       if (existing) return existing;
     } catch (e) {
       // ignore
@@ -2816,7 +3114,7 @@
       if (originalSummary && originalSummary !== "—") lines.push("Original: " + originalSummary);
       if (processedSummary && processedSummary !== "—") {
         var action = data.action ? actionLabel(data.action) : "";
-        lines.push("After: " + processedSummary + (action ? (" • " + action) : ""));
+        lines.push("After: " + processedSummary + (action ? " • " + action : ""));
       }
 
       if (lines.length === 0 && status) lines.push("Status: " + status);
@@ -2856,8 +3154,11 @@
     var panel = ensureVideoMetaPanel();
     if (!panel) return;
 
-    var name = String(path || "").split("/").pop() || String(path || "");
-    var status = (data && data.status) ? String(data.status) : "—";
+    var name =
+      String(path || "")
+        .split("/")
+        .pop() || String(path || "");
+    var status = data && data.status ? String(data.status) : "—";
     var action = data && data.action ? actionLabel(data.action) : "—";
 
     var uploadedAt = data && data.uploaded_at != null ? safeToIso(data.uploaded_at) : "";
@@ -2887,7 +3188,13 @@
       return;
     }
 
-    var loading = { status: "loading", action: "", uploaded_at: null, original: null, processed: null };
+    var loading = {
+      status: "loading",
+      action: "",
+      uploaded_at: null,
+      original: null,
+      processed: null,
+    };
     if (shouldShowVideoMetaPanel(path)) updateVideoMetaPanel(path, loading);
     updateVideoMetaInline(path, loading);
     fetchVideoMeta(path).then(function (data) {
@@ -2967,8 +3274,12 @@
     var style = document.createElement("style");
     style.id = SHARE_EXPIRE_STYLE_ID;
     style.textContent =
-      "." + SHARE_EXPIRE_BTN_CLASS + " { margin-left: 6px; }\n" +
-      "." + SHARE_EXPIRE_BTN_CLASS + "[disabled] { opacity: 0.55; cursor: not-allowed; }\n";
+      "." +
+      SHARE_EXPIRE_BTN_CLASS +
+      " { margin-left: 6px; }\n" +
+      "." +
+      SHARE_EXPIRE_BTN_CLASS +
+      "[disabled] { opacity: 0.55; cursor: not-allowed; }\n";
     document.head.appendChild(style);
   }
 
@@ -3045,7 +3356,7 @@
   }
 
   function fetchShareAliases(limit) {
-    var q = typeof limit === "number" ? ("?limit=" + String(limit)) : "";
+    var q = typeof limit === "number" ? "?limit=" + String(limit) : "";
     return dropprFetch("/api/droppr/shares/aliases" + q, {
       method: "GET",
       headers: {},
@@ -3069,7 +3380,7 @@
     if (!tds || tds.length < 2) return;
 
     var expireText = fmtRelativeExpire(alias.target_expire);
-    var base = expireText ? ("Aliased (" + expireText + ")") : "Aliased";
+    var base = expireText ? "Aliased (" + expireText + ")" : "Aliased";
     tds[1].textContent = base;
   }
 
@@ -3111,7 +3422,8 @@
         for (var r = 0; r < rows.length; r++) {
           var row = rows[r];
           if (!row || !row.querySelector) continue;
-          var anchor = row.querySelector('a[href*="/share/"]') || row.querySelector('a[href*="share/"]');
+          var anchor =
+            row.querySelector('a[href*="/share/"]') || row.querySelector('a[href*="share/"]');
           if (!anchor) continue;
           var hash = extractShareHashFromHref(anchor.getAttribute("href"));
           if (!hash) continue;
@@ -3151,7 +3463,8 @@
       }
       if (!row || !row.querySelector) continue;
 
-      var shareAnchor = row.querySelector('a[href*="/share/"]') || row.querySelector('a[href*="share/"]');
+      var shareAnchor =
+        row.querySelector('a[href*="/share/"]') || row.querySelector('a[href*="share/"]');
       if (!shareAnchor) continue;
 
       var shareHash = extractShareHashFromHref(shareAnchor.getAttribute("href"));
@@ -3176,8 +3489,9 @@
           var defaultHours = getDefaultShareExpireHours();
           var promptText =
             "Set share duration in hours from now (0 = permanent)\n\n" +
-            (pathLabel ? ("Path: " + pathLabel + "\n") : "") +
-            "Share: " + hash;
+            (pathLabel ? "Path: " + pathLabel + "\n" : "") +
+            "Share: " +
+            hash;
           var raw = null;
           try {
             raw = window.prompt(promptText, String(defaultHours));
@@ -3222,7 +3536,10 @@
             .then(function (data) {
               var h = data && data.hash ? data.hash : hash;
               var shareUrl = window.location.origin + "/api/public/dl/" + h;
-              var note = hours === 0 ? "Share is now permanent." : ("Share now expires in " + hours + " hours.");
+              var note =
+                hours === 0
+                  ? "Share is now permanent."
+                  : "Share now expires in " + hours + " hours.";
               note += " (Link stays the same.)";
 
               if (rowEl && data) {
@@ -3261,7 +3578,7 @@
     if (!isLoggedIn()) return;
 
     var dialogs = document.querySelectorAll
-      ? document.querySelectorAll(".v-dialog__content--active, .v-dialog--active, [role=\"dialog\"]")
+      ? document.querySelectorAll('.v-dialog__content--active, .v-dialog--active, [role="dialog"]')
       : [];
     if (!dialogs || dialogs.length === 0) return;
 
@@ -3286,9 +3603,13 @@
         if (host.querySelector && host.querySelector("." + STREAM_SHARE_BTN_CLASS)) continue;
 
         var streamBtn = copyBtn.cloneNode(true);
-        if (streamBtn.classList && streamBtn.classList.remove) streamBtn.classList.remove("copy-clipboard");
-        streamBtn.className = String(streamBtn.className || "").replace(/\bcopy-clipboard\b/g, "").trim();
-        streamBtn.className = (streamBtn.className ? (streamBtn.className + " ") : "") + STREAM_SHARE_BTN_CLASS;
+        if (streamBtn.classList && streamBtn.classList.remove)
+          streamBtn.classList.remove("copy-clipboard");
+        streamBtn.className = String(streamBtn.className || "")
+          .replace(/\bcopy-clipboard\b/g, "")
+          .trim();
+        streamBtn.className =
+          (streamBtn.className ? streamBtn.className + " " : "") + STREAM_SHARE_BTN_CLASS;
         streamBtn.type = "button";
         streamBtn.title = "Stream Gallery link";
         streamBtn.setAttribute("aria-label", "Stream Gallery link");
@@ -3333,7 +3654,7 @@
           (el.closest(".v-dialog__content--active") ||
             el.closest(".v-dialog--active") ||
             el.closest(".v-menu__content") ||
-            el.closest("[role=\"dialog\"]"))
+            el.closest('[role="dialog"]'))
         );
       } catch (e) {
         return false;
@@ -3353,7 +3674,8 @@
 
     function attachToShareButton(shareBtn) {
       if (!shareBtn) return false;
-      if (shareBtn.classList && shareBtn.classList.contains(FILES_STREAM_SHARE_BTN_CLASS)) return false;
+      if (shareBtn.classList && shareBtn.classList.contains(FILES_STREAM_SHARE_BTN_CLASS))
+        return false;
       if (isInDialogOrMenu(shareBtn)) return false;
       if (!isVisible(shareBtn)) return false;
 
@@ -3366,7 +3688,9 @@
         shareBtn.getAttribute("aria-disabled") === "true" ||
         (shareBtn.classList && shareBtn.classList.contains("v-btn--disabled"));
 
-      var existing = host.querySelector ? host.querySelector("." + FILES_STREAM_SHARE_BTN_CLASS) : null;
+      var existing = host.querySelector
+        ? host.querySelector("." + FILES_STREAM_SHARE_BTN_CLASS)
+        : null;
       if (existing) {
         existing.disabled = disabled;
         try {
@@ -3379,7 +3703,8 @@
         }
 
         try {
-          existing.style.display = shareBtn.style && shareBtn.style.display === "none" ? "none" : "";
+          existing.style.display =
+            shareBtn.style && shareBtn.style.display === "none" ? "none" : "";
         } catch (e4) {
           // ignore
         }
@@ -3387,7 +3712,8 @@
       }
 
       var newBtn = shareBtn.cloneNode(true);
-      if (newBtn.classList && newBtn.classList.add) newBtn.classList.add(FILES_STREAM_SHARE_BTN_CLASS);
+      if (newBtn.classList && newBtn.classList.add)
+        newBtn.classList.add(FILES_STREAM_SHARE_BTN_CLASS);
       newBtn.title = "Stream Share";
       newBtn.setAttribute("aria-label", "Stream Share");
       setMaterialIconText(newBtn, "smart_display");
@@ -3423,7 +3749,7 @@
 
             showAutoShareModal({
               title: "Stream link ready",
-              subtitle: label ? ("Selected: " + label) : "",
+              subtitle: label ? "Selected: " + label : "",
               urlLabel: "Stream Gallery (best for big videos):",
               url: streamUrl,
               openUrl: streamUrl,
@@ -3435,7 +3761,7 @@
           .catch(function (err) {
             showAutoShareModal({
               title: "Could not create share link",
-              subtitle: label ? ("Selected: " + label) : "",
+              subtitle: label ? "Selected: " + label : "",
               url: "",
               note: String(err && err.message ? err.message : err),
               autoCopy: false,
@@ -3477,9 +3803,12 @@
       if (isInDialogOrMenu(el)) continue;
       if (!isVisible(el)) continue;
 
-      var label = (el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("title"))) || "";
+      var label =
+        (el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("title"))) || "";
       var labelLower = String(label || "").toLowerCase();
-      var textLower = String(el.textContent || "").trim().toLowerCase();
+      var textLower = String(el.textContent || "")
+        .trim()
+        .toLowerCase();
 
       if (labelLower.indexOf("share") === -1 && textLower !== "share") continue;
 
@@ -3493,7 +3822,9 @@
     var style = document.createElement("style");
     style.id = AUTO_SHARE_STYLE_ID;
     style.textContent =
-      "#" + AUTO_SHARE_MODAL_ID + " {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  right: 18px;\n" +
       "  bottom: 74px;\n" +
@@ -3508,27 +3839,35 @@
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  overflow: hidden;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .hdr {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .hdr {\n" +
       "  display: flex;\n" +
       "  align-items: flex-start;\n" +
       "  justify-content: space-between;\n" +
       "  gap: 12px;\n" +
       "  padding: 14px 14px 8px 14px;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .title {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .title {\n" +
       "  font-size: 14px;\n" +
       "  font-weight: 800;\n" +
       "  line-height: 1.2;\n" +
       "  color: var(--text-primary, #fff);\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .subtitle {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .subtitle {\n" +
       "  font-size: 12px;\n" +
       "  line-height: 1.2;\n" +
       "  margin-top: 4px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.8));\n" +
       "  word-break: break-word;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .close {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .close {\n" +
       "  appearance: none;\n" +
       "  border: 0;\n" +
       "  background: transparent;\n" +
@@ -3539,18 +3878,26 @@
       "  padding: 6px 8px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .close:hover {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .close:hover {\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .body {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .body {\n" +
       "  padding: 0 14px 14px 14px;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .row {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .row {\n" +
       "  display: flex;\n" +
       "  gap: 10px;\n" +
       "  align-items: center;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " input {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " input {\n" +
       "  flex: 1 1 auto;\n" +
       "  width: 100%;\n" +
       "  border-radius: 10px;\n" +
@@ -3561,11 +3908,15 @@
       "  font-size: 13px;\n" +
       "  outline: none;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " input:focus {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " input:focus {\n" +
       "  border-color: rgba(99,102,241,0.7);\n" +
       "  box-shadow: 0 0 0 3px rgba(99,102,241,0.18);\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .btn {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .btn {\n" +
       "  flex: 0 0 auto;\n" +
       "  cursor: pointer;\n" +
       "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
@@ -3576,14 +3927,20 @@
       "  padding: 10px 12px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .btn.secondary {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .btn.secondary {\n" +
       "  background: var(--hover-bg, rgba(255,255,255,0.08));\n" +
       "  color: var(--text-primary, #fff);\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .btn:hover {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .btn:hover {\n" +
       "  filter: brightness(1.05);\n" +
       "}\n" +
-      "#" + AUTO_SHARE_MODAL_ID + " .note {\n" +
+      "#" +
+      AUTO_SHARE_MODAL_ID +
+      " .note {\n" +
       "  margin-top: 10px;\n" +
       "  font-size: 12px;\n" +
       "  color: var(--text-secondary, rgba(229,231,235,0.72));\n" +
@@ -3616,7 +3973,8 @@
         textarea.value = text;
         textarea.setAttribute("readonly", "");
         // Position on-screen but visually hidden (iOS Safari needs this)
-        textarea.style.cssText = "position:fixed;top:0;left:0;width:2em;height:2em;padding:0;border:none;outline:none;box-shadow:none;background:transparent;font-size:16px;";
+        textarea.style.cssText =
+          "position:fixed;top:0;left:0;width:2em;height:2em;padding:0;border:none;outline:none;box-shadow:none;background:transparent;font-size:16px;";
         document.body.appendChild(textarea);
 
         // iOS Safari specific handling
@@ -3676,7 +4034,9 @@
     var streamUrl = buildStreamUrl(shareHash);
     var attrNames = ["data-clipboard-text", "data-clipboardText", "data-copy", "data-text"];
     var attrTargets = rootEl.querySelectorAll
-      ? rootEl.querySelectorAll("[data-clipboard-text],[data-clipboardText],[data-copy],[data-text]")
+      ? rootEl.querySelectorAll(
+          "[data-clipboard-text],[data-clipboardText],[data-copy],[data-text]"
+        )
       : [];
 
     for (var i = 0; i < attrTargets.length; i++) {
@@ -3731,7 +4091,8 @@
 
         var anchors = cur.querySelectorAll("a[href]");
         for (var ai = 0; ai < anchors.length; ai++) {
-          var href = anchors[ai] && anchors[ai].getAttribute ? anchors[ai].getAttribute("href") : null;
+          var href =
+            anchors[ai] && anchors[ai].getAttribute ? anchors[ai].getAttribute("href") : null;
           var ah = extractShareHashFromText(href);
           if (ah) return ah;
         }
@@ -3746,7 +4107,9 @@
   function setMaterialIconText(btn, iconText) {
     if (!btn) return;
     var icon = btn.querySelector
-      ? (btn.querySelector("i.material-icons") || btn.querySelector(".material-icons") || btn.querySelector("i"))
+      ? btn.querySelector("i.material-icons") ||
+        btn.querySelector(".material-icons") ||
+        btn.querySelector("i")
       : null;
     if (!icon) return;
     icon.textContent = iconText;
@@ -3757,10 +4120,18 @@
     var style = document.createElement("style");
     style.id = STREAM_SHARE_STYLE_ID;
     style.textContent =
-      "." + STREAM_SHARE_BTN_CLASS + " { margin-left: 6px; }\n" +
-      "." + STREAM_SHARE_BTN_CLASS + "[disabled] { opacity: 0.55; cursor: not-allowed; }\n" +
-      "." + FILES_STREAM_SHARE_BTN_CLASS + " { margin-left: 6px; }\n" +
-      "." + FILES_STREAM_SHARE_BTN_CLASS + "[disabled] { opacity: 0.55; cursor: not-allowed; }\n";
+      "." +
+      STREAM_SHARE_BTN_CLASS +
+      " { margin-left: 6px; }\n" +
+      "." +
+      STREAM_SHARE_BTN_CLASS +
+      "[disabled] { opacity: 0.55; cursor: not-allowed; }\n" +
+      "." +
+      FILES_STREAM_SHARE_BTN_CLASS +
+      " { margin-left: 6px; }\n" +
+      "." +
+      FILES_STREAM_SHARE_BTN_CLASS +
+      "[disabled] { opacity: 0.55; cursor: not-allowed; }\n";
     document.head.appendChild(style);
   }
 
@@ -4065,7 +4436,12 @@
       return [normalizedBase];
     }
 
-    if (fileNames.length === 1 && rawPath && rawPath !== "/" && pathEndsWithFileName(rawPath, fileNames[0])) {
+    if (
+      fileNames.length === 1 &&
+      rawPath &&
+      rawPath !== "/" &&
+      pathEndsWithFileName(rawPath, fileNames[0])
+    ) {
       return [normalizePathEncoded(rawPath)];
     }
 
@@ -4192,7 +4568,7 @@
         var fileLabel = decodeURIComponent(String(pathEncoded).split("/").pop() || "");
         showAutoShareModal({
           title: "Share link ready",
-          subtitle: fileLabel ? ("Uploaded: " + fileLabel) : "",
+          subtitle: fileLabel ? "Uploaded: " + fileLabel : "",
           urlLabel: "Stream Gallery (best for big videos):",
           url: streamUrl,
           openUrl: streamUrl,
@@ -4400,7 +4776,9 @@
         if (tusPath && (mUpper === "POST" || mUpper === "PATCH")) {
           tusEntry = ensureTusEntry(tusPath);
           if (tusEntry && mUpper === "POST" && tusEntry.uploadLength == null) {
-            tusEntry.uploadLength = parseIntOrNull(this.__dropprHeaders && this.__dropprHeaders["upload-length"]);
+            tusEntry.uploadLength = parseIntOrNull(
+              this.__dropprHeaders && this.__dropprHeaders["upload-length"]
+            );
           }
         }
 
@@ -4458,7 +4836,12 @@
     try {
       if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true;
       // iPadOS 13+ reports as "Macintosh" but still has touch points.
-      if (navigator.platform === "MacIntel" && navigator.maxTouchPoints && navigator.maxTouchPoints > 1) return true;
+      if (
+        navigator.platform === "MacIntel" &&
+        navigator.maxTouchPoints &&
+        navigator.maxTouchPoints > 1
+      )
+        return true;
     } catch (e) {
       // ignore
     }
@@ -4476,7 +4859,9 @@
     var style = document.createElement("style");
     style.id = ICLOUD_WAIT_STYLE_ID;
     style.textContent =
-      "#" + ICLOUD_WAIT_MODAL_ID + " {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " {\n" +
       "  position: fixed;\n" +
       "  top: 18px;\n" +
       "  left: 50%;\n" +
@@ -4492,13 +4877,17 @@
       "  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;\n" +
       "  overflow: hidden;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .row {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .row {\n" +
       "  display: flex;\n" +
       "  align-items: center;\n" +
       "  gap: 10px;\n" +
       "  padding: 14px;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .spinner {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .spinner {\n" +
       "  width: 18px;\n" +
       "  height: 18px;\n" +
       "  border-radius: 999px;\n" +
@@ -4507,29 +4896,39 @@
       "  animation: droppr-spin 1s linear infinite;\n" +
       "  flex: 0 0 auto;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .txt {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .txt {\n" +
       "  flex: 1 1 auto;\n" +
       "  min-width: 0;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .title {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .title {\n" +
       "  font-size: 13px;\n" +
       "  font-weight: 800;\n" +
       "  color: var(--text-primary, #fff);\n" +
       "  line-height: 1.15;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .status {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .status {\n" +
       "  margin-top: 4px;\n" +
       "  font-size: 12px;\n" +
       "  color: var(--droppr-overlay-muted, rgba(229,231,235,0.82));\n" +
       "  word-break: break-word;\n" +
       "  line-height: 1.2;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .note {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .note {\n" +
       "  margin-top: 6px;\n" +
       "  font-size: 12px;\n" +
       "  color: var(--text-secondary, rgba(229,231,235,0.65));\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .btn {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .btn {\n" +
       "  flex: 0 0 auto;\n" +
       "  cursor: pointer;\n" +
       "  border: 1px solid var(--border-color, rgba(255,255,255,0.12));\n" +
@@ -4540,7 +4939,9 @@
       "  padding: 9px 11px;\n" +
       "  border-radius: 10px;\n" +
       "}\n" +
-      "#" + ICLOUD_WAIT_MODAL_ID + " .btn:hover {\n" +
+      "#" +
+      ICLOUD_WAIT_MODAL_ID +
+      " .btn:hover {\n" +
       "  filter: brightness(1.05);\n" +
       "}\n" +
       "@keyframes droppr-spin { to { transform: rotate(360deg); } }\n";
@@ -4632,11 +5033,16 @@
         resolve({ ok: false, bytes: 0 });
       };
 
-      timeout = setTimeout(function () {
-        cleanup();
-        try { reader.abort(); } catch (e) {}
-        resolve({ ok: false, bytes: 0 });
-      }, Math.max(1000, parseIntOrNull(timeoutMs) || 0));
+      timeout = setTimeout(
+        function () {
+          cleanup();
+          try {
+            reader.abort();
+          } catch (e) {}
+          resolve({ ok: false, bytes: 0 });
+        },
+        Math.max(1000, parseIntOrNull(timeoutMs) || 0)
+      );
 
       try {
         reader.readAsArrayBuffer(blob);
@@ -4716,8 +5122,12 @@
 
     var warning = document.createElement("div");
     warning.id = WARNING_ID;
-    warning.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2147483002;padding:16px 24px;border-radius:12px;background:rgba(220,38,38,0.95);color:#fff;font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600;box-shadow:0 10px 40px rgba(0,0,0,0.4);max-width:90vw;text-align:center;";
-    warning.innerHTML = '<div style="margin-bottom:8px;">File not ready: ' + (fileName || 'Unknown') + '</div>' +
+    warning.style.cssText =
+      "position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2147483002;padding:16px 24px;border-radius:12px;background:rgba(220,38,38,0.95);color:#fff;font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;font-weight:600;box-shadow:0 10px 40px rgba(0,0,0,0.4);max-width:90vw;text-align:center;";
+    warning.innerHTML =
+      '<div style="margin-bottom:8px;">File not ready: ' +
+      (fileName || "Unknown") +
+      "</div>" +
       '<div style="font-weight:400;font-size:12px;opacity:0.9;">Please wait for the file to download from iCloud before uploading.</div>';
 
     document.body.appendChild(warning);
@@ -4776,7 +5186,7 @@
     }
 
     function waitOne(file, index, total) {
-      var name = (file && file.name) ? String(file.name) : "file";
+      var name = file && file.name ? String(file.name) : "file";
       var attempt = 0;
 
       function loop() {
@@ -4784,7 +5194,8 @@
         if (nowMs() - start > maxWaitMs) return Promise.resolve(false);
 
         attempt += 1;
-        var status = "Preparing " + (index + 1) + "/" + total + ": " + name + " (" + elapsedSec() + "s)";
+        var status =
+          "Preparing " + (index + 1) + "/" + total + ": " + name + " (" + elapsedSec() + "s)";
         onStatus(status);
 
         return validateFileReadable(file, { timeoutMs: 15000 }).then(function (ok) {
@@ -4818,83 +5229,93 @@
     window.__dropprFileInputPatched = true;
 
     // Intercept file input change events
-    document.addEventListener("change", function (e) {
-      var input = e.target;
-      if (!input || input.type !== "file" || !input.files || input.files.length === 0) return;
-      if (fileInputBypass) return;
+    document.addEventListener(
+      "change",
+      function (e) {
+        var input = e.target;
+        if (!input || input.type !== "file" || !input.files || input.files.length === 0) return;
+        if (fileInputBypass) return;
 
-      var files = Array.prototype.slice.call(input.files);
-      var shouldGate = isIOSDevice() || hasAnyZeroSize(files);
-      if (!shouldGate) return;
+        var files = Array.prototype.slice.call(input.files);
+        var shouldGate = isIOSDevice() || hasAnyZeroSize(files);
+        if (!shouldGate) return;
 
-      // Block FileBrowser from starting the upload until iOS/iCloud has a fully-readable file.
-      e.stopImmediatePropagation();
-      e.preventDefault();
+        // Block FileBrowser from starting the upload until iOS/iCloud has a fully-readable file.
+        e.stopImmediatePropagation();
+        e.preventDefault();
 
-      if (fileInputGate && fileInputGate.cancel) fileInputGate.cancel();
+        if (fileInputGate && fileInputGate.cancel) fileInputGate.cancel();
 
-      var gate = { canceled: false, cancel: null };
-      fileInputGate = gate;
+        var gate = { canceled: false, cancel: null };
+        fileInputGate = gate;
 
-      var overlay = null;
-      var overlayTimer = null;
-      var lastStatus = "Preparing upload…";
+        var overlay = null;
+        var overlayTimer = null;
+        var lastStatus = "Preparing upload…";
 
-      function setStatus(text) {
-        lastStatus = text || lastStatus;
-        if (overlay && overlay.setStatus) overlay.setStatus(lastStatus);
-      }
-
-      function cleanupOverlay() {
-        if (overlayTimer) {
-          clearTimeout(overlayTimer);
-          overlayTimer = null;
+        function setStatus(text) {
+          lastStatus = text || lastStatus;
+          if (overlay && overlay.setStatus) overlay.setStatus(lastStatus);
         }
-        if (overlay && overlay.dismiss) overlay.dismiss();
-        overlay = null;
-      }
 
-      gate.cancel = function () {
-        gate.canceled = true;
-        cleanupOverlay();
-      };
+        function cleanupOverlay() {
+          if (overlayTimer) {
+            clearTimeout(overlayTimer);
+            overlayTimer = null;
+          }
+          if (overlay && overlay.dismiss) overlay.dismiss();
+          overlay = null;
+        }
 
-      overlayTimer = setTimeout(function () {
-        if (gate.canceled) return;
-        // Another gate took over; don't show.
-        if (fileInputGate !== gate) return;
-        overlay = showIcloudWaitModal();
-        overlay.setStatus(lastStatus);
-        overlay.onCancel(function () {
+        gate.cancel = function () {
           gate.canceled = true;
           cleanupOverlay();
-          try { input.value = ""; } catch (e2) {}
-        });
-      }, 350);
+        };
 
-      waitForFilesReadable(files, { token: gate, onStatus: setStatus, maxWaitMs: 20 * 60 * 1000 })
-        .then(function (ok) {
-          if (fileInputGate !== gate) return;
-          cleanupOverlay();
+        overlayTimer = setTimeout(function () {
           if (gate.canceled) return;
-          if (ok) {
-            dispatchSyntheticChange(input);
-            return;
-          }
+          // Another gate took over; don't show.
+          if (fileInputGate !== gate) return;
+          overlay = showIcloudWaitModal();
+          overlay.setStatus(lastStatus);
+          overlay.onCancel(function () {
+            gate.canceled = true;
+            cleanupOverlay();
+            try {
+              input.value = "";
+            } catch (e2) {}
+          });
+        }, 350);
 
-          var name = files && files[0] && files[0].name ? files[0].name : "";
-          showFileNotReadyWarning(name);
-          try { input.value = ""; } catch (e3) {}
-        })
-        .catch(function () {
-          if (fileInputGate !== gate) return;
-          cleanupOverlay();
-          if (gate.canceled) return;
-          var name = files && files[0] && files[0].name ? files[0].name : "";
-          showFileNotReadyWarning(name);
-          try { input.value = ""; } catch (e4) {}
-        });
-    }, true);
+        waitForFilesReadable(files, { token: gate, onStatus: setStatus, maxWaitMs: 20 * 60 * 1000 })
+          .then(function (ok) {
+            if (fileInputGate !== gate) return;
+            cleanupOverlay();
+            if (gate.canceled) return;
+            if (ok) {
+              dispatchSyntheticChange(input);
+              return;
+            }
+
+            var name = files && files[0] && files[0].name ? files[0].name : "";
+            showFileNotReadyWarning(name);
+            try {
+              input.value = "";
+            } catch (e3) {}
+          })
+          .catch(function () {
+            if (fileInputGate !== gate) return;
+            cleanupOverlay();
+            if (gate.canceled) return;
+            var name = files && files[0] && files[0].name ? files[0].name : "";
+            showFileNotReadyWarning(name);
+            try {
+              input.value = "";
+            } catch (e4) {}
+          });
+      },
+      true
+    );
   }
 
   function boot() {

@@ -21,6 +21,9 @@ services:
       - "${DROPBOX_HOST_PORT:-8099}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/robots.txt:/usr/share/nginx/html/robots.txt:ro
+      - ./nginx/404.html:/usr/share/nginx/html/404.html:ro
+      - ./nginx/50x.html:/usr/share/nginx/html/50x.html:ro
       - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
       - ./nginx/analytics.html:/usr/share/nginx/html/analytics.html:ro
       - ./nginx/media-viewer.html:/usr/share/nginx/html/media-viewer.html:ro
@@ -29,7 +32,7 @@ services:
       - ./nginx/stream-gallery.html:/usr/share/nginx/html/stream-gallery.html:ro
       - ./nginx/request.html:/usr/share/nginx/html/request.html:ro
       - ./nginx/droppr-theme.css:/usr/share/nginx/html/droppr-theme.css:ro
-      - ./nginx/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
+      - ./nginx/static/droppr-panel.js:/usr/share/nginx/html/droppr-panel.js:ro
       - ./nginx/static:/usr/share/nginx/html/static:ro
       - ./database/proxy-cache:/usr/share/nginx/html/proxy-cache:ro
       - ./database/hls-cache:/usr/share/nginx/html/hls-cache:ro
@@ -46,6 +49,10 @@ services:
     command: gunicorn --bind 0.0.0.0:5000 --workers 4 --threads 10 --access-logfile - --error-logfile - app:app
     user: "1000:1000"
     volumes:
+      - ./media-server/app:/app/app
+      - ./media-server/tests:/app/tests
+      - ./media-server/pytest.ini:/app/pytest.ini
+      - ./media-server/pyproject.toml:/app/pyproject.toml
       - ./database:/database
       - ./data:/srv
     environment:
@@ -78,6 +85,10 @@ services:
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     user: "1000:1000"
     volumes:
+      - ./media-server/app:/app/app
+      - ./media-server/tests:/app/tests
+      - ./media-server/pytest.ini:/app/pytest.ini
+      - ./media-server/pyproject.toml:/app/pyproject.toml
       - ./database:/database
       - ./data:/srv
     environment:

@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import subprocess
+import time
 from urllib.parse import quote
 
 from flask import Blueprint, Response, jsonify, redirect, request
@@ -53,10 +54,15 @@ def create_share_media_blueprint(deps: dict):
     ensure_hd_mp4 = deps["ensure_hd_mp4"]
     hls_renditions = deps["hls_renditions"]
     ensure_video_meta_record = deps["ensure_video_meta_record"]
+    video_transcode_count = deps["video_transcode_count"]
+    video_transcode_latency = deps["video_transcode_latency"]
+    thumbnail_count = deps["thumbnail_count"]
 
     bp = Blueprint("share_media", __name__)
 
-    def _build_thumbnail_times(duration: float | None, raw_times: str | None, count: int | None) -> list[float]:
+    def _build_thumbnail_times(
+        duration: float | None, raw_times: str | None, count: int | None
+    ) -> list[float]:
         times: list[float] = []
         if raw_times:
             for part in raw_times.split(","):
@@ -96,6 +102,8 @@ def create_share_media_blueprint(deps: dict):
             return "Invalid share hash", 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return "This share link has expired or reached its limit.", 410
 
         filename = filename or ""
         safe = safe_rel_path(filename)
@@ -138,6 +146,8 @@ def create_share_media_blueprint(deps: dict):
 
         # Check cache first (fast path)
         if os.path.exists(cache_path):
+            if thumbnail_count:
+                thumbnail_count.labels("hit").inc()
             try:
                 # Touch the file to update access time (optional)
                 os.utime(cache_path, None)
@@ -157,6 +167,8 @@ def create_share_media_blueprint(deps: dict):
 
         # Serialize generation for this specific file
         try:
+            if thumbnail_count:
+                thumbnail_count.labels("miss").inc()
             with open(lock_path, "w") as lock_file:
                 # Acquire exclusive lock (blocking)
                 fcntl.flock(lock_file, fcntl.LOCK_EX)
@@ -177,13 +189,19 @@ def create_share_media_blueprint(deps: dict):
                             src_url=src_url,
                             dst_path=dst_path,
                             seek_seconds=(
-                                preview_time if (is_video and preview_time is not None) else (1 if is_video else None)
+                                preview_time
+                                if (is_video and preview_time is not None)
+                                else (1 if is_video else None)
                             ),
                             fmt=fmt_value,
                             width=thumb_width,
                         )
                         result = subprocess.run(
-                            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=thumb_ffmpeg_timeout_seconds
+                            cmd,
+                            check=False,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            timeout=thumb_ffmpeg_timeout_seconds,
                         )
                         if result.returncode != 0 and is_video:
                             cmd = ffmpeg_thumbnail_cmd(
@@ -195,12 +213,14 @@ def create_share_media_blueprint(deps: dict):
                             )
                             result = subprocess.run(
                                 cmd,
+                                check=False,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
                                 timeout=thumb_ffmpeg_timeout_seconds,
                             )
                         return result
 
+                    start_time = time.perf_counter()
                     with thumb_sema:
                         result = run_thumb(fmt, cache_path)
 
@@ -226,11 +246,15 @@ def create_share_media_blueprint(deps: dict):
                                 break
 
                     if result.returncode != 0:
+                        if thumbnail_count:
+                            thumbnail_count.labels("error").inc()
                         err = result.stderr.decode(errors="replace") if result else "unknown error"
                         logger.error("ffmpeg failed for %s: %s", safe, err)
                         return "Thumbnail generation failed", 500
 
                     if os.path.exists(cache_path):
+                        if thumbnail_count:
+                            thumbnail_count.labels("success").inc()
                         enqueue_r2_upload_file(
                             f"r2:thumb:{cache_basename}:{fmt_used}",
                             cache_path,
@@ -286,7 +310,9 @@ def create_share_media_blueprint(deps: dict):
 
         duration = None
         try:
-            src_url = f"{filebrowser_public_dl_api}/{source_hash}/{quote(safe, safe='/')}?inline=true"
+            src_url = (
+                f"{filebrowser_public_dl_api}/{source_hash}/{quote(safe, safe='/')}?inline=true"
+            )
             meta = ffprobe_video_meta(src_url)
             if meta and isinstance(meta.get("duration"), (int, float)):
                 duration = float(meta["duration"])
@@ -314,6 +340,8 @@ def create_share_media_blueprint(deps: dict):
             return "Invalid share hash", 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return "This share link has expired or reached its limit.", 410
 
         filename = filename or ""
         safe = safe_rel_path(filename)
@@ -338,7 +366,9 @@ def create_share_media_blueprint(deps: dict):
 
         size = int(meta.get("size") or 0)
         modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
-        proxy_key = proxy_cache_key(share_hash=source_hash, file_path=safe, size=size, modified=modified)
+        proxy_key = proxy_cache_key(
+            share_hash=source_hash, file_path=safe, size=size, modified=modified
+        )
         r2_redirect = maybe_redirect_r2(r2_proxy_key(proxy_key), require_public=False)
         if r2_redirect:
             return r2_redirect
@@ -363,6 +393,8 @@ def create_share_media_blueprint(deps: dict):
             return "Invalid share hash", 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return "This share link has expired or reached its limit.", 410
 
         filename = filename or ""
         safe = safe_rel_path(filename)
@@ -386,13 +418,17 @@ def create_share_media_blueprint(deps: dict):
 
         size = int(meta.get("size") or 0)
         modified = meta.get("modified") if isinstance(meta.get("modified"), str) else None
-        hls_key = hls_cache_key(share_hash=source_hash, file_path=safe, size=size, modified=modified)
+        hls_key = hls_cache_key(
+            share_hash=source_hash, file_path=safe, size=size, modified=modified
+        )
         r2_redirect = maybe_redirect_r2(r2_hls_key(hls_key, "master.m3u8"), require_public=True)
         if r2_redirect:
             return r2_redirect
 
         try:
-            _, _, public_url = ensure_hls_package(share_hash=source_hash, file_path=safe, size=size, modified=modified)
+            _, _, public_url = ensure_hls_package(
+                share_hash=source_hash, file_path=safe, size=size, modified=modified
+            )
             return redirect(public_url, code=302)
         except subprocess.TimeoutExpired:
             logger.error("ffmpeg HLS timed out for %s", safe)
@@ -436,7 +472,9 @@ def create_share_media_blueprint(deps: dict):
         else:
             original_url = f"/api/public/file/{source_hash}?inline=true"
 
-        proxy_key = proxy_cache_key(share_hash=source_hash, file_path=safe, size=original_size, modified=modified)
+        proxy_key = proxy_cache_key(
+            share_hash=source_hash, file_path=safe, size=original_size, modified=modified
+        )
         proxy_path = os.path.join(proxy_cache_dir, f"{proxy_key}.mp4")
         proxy_url = f"/api/proxy-cache/{proxy_key}.mp4"
 
@@ -447,7 +485,9 @@ def create_share_media_blueprint(deps: dict):
             proxy_url = proxy_cdn_url
             proxy_ready = True
 
-        hd_key = hd_cache_key(share_hash=source_hash, file_path=safe, size=original_size, modified=modified)
+        hd_key = hd_cache_key(
+            share_hash=source_hash, file_path=safe, size=original_size, modified=modified
+        )
         hd_path = os.path.join(proxy_cache_dir, f"{hd_key}.mp4")
         hd_url = f"/api/proxy-cache/{hd_key}.mp4"
         hd_ready = os.path.exists(hd_path)
@@ -457,7 +497,9 @@ def create_share_media_blueprint(deps: dict):
             hd_url = hd_cdn_url
             hd_ready = True
 
-        hls_key = hls_cache_key(share_hash=source_hash, file_path=safe, size=original_size, modified=modified)
+        hls_key = hls_cache_key(
+            share_hash=source_hash, file_path=safe, size=original_size, modified=modified
+        )
         hls_dir = os.path.join(hls_cache_dir, hls_key)
         hls_master = os.path.join(hls_dir, "master.m3u8")
         hls_url = f"/api/hls-cache/{hls_key}/master.m3u8"
@@ -568,6 +610,8 @@ def create_share_media_blueprint(deps: dict):
             return jsonify({"error": "Invalid share hash"}), 400
 
         source_hash = resolve_share_hash(share_hash)
+        if source_hash is None:
+            return jsonify({"error": "This share link has expired or reached its limit."}), 410
 
         filename = filename or ""
         safe = safe_rel_path(filename)
@@ -593,7 +637,9 @@ def create_share_media_blueprint(deps: dict):
         db_path = "/" + safe.lstrip("/")
         row = None
         try:
-            src_url = f"{filebrowser_public_dl_api}/{source_hash}/{quote(safe, safe='/')}?inline=true"
+            src_url = (
+                f"{filebrowser_public_dl_api}/{source_hash}/{quote(safe, safe='/')}?inline=true"
+            )
             row = ensure_video_meta_record(
                 db_path=db_path,
                 src_url=src_url,
@@ -645,7 +691,9 @@ def create_share_media_blueprint(deps: dict):
                 "uploaded_at": int(row["uploaded_at"] or 0) if row["uploaded_at"] else None,
                 "processed_at": int(row["processed_at"] or 0) if row["processed_at"] else None,
                 "original_size": int(row["original_size"] or 0) if row["original_size"] else None,
-                "processed_size": int(row["processed_size"] or 0) if row["processed_size"] else None,
+                "processed_size": (
+                    int(row["processed_size"] or 0) if row["processed_size"] else None
+                ),
                 "original": original_meta,
                 "processed": processed_meta,
             }

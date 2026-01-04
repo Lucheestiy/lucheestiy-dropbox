@@ -106,7 +106,9 @@ def create_droppr_media_blueprint(require_admin_access, deps: dict):
                 "uploaded_at": int(row["uploaded_at"] or 0) if row["uploaded_at"] else None,
                 "processed_at": int(row["processed_at"] or 0) if row["processed_at"] else None,
                 "original_size": int(row["original_size"] or 0) if row["original_size"] else None,
-                "processed_size": int(row["processed_size"] or 0) if row["processed_size"] else None,
+                "processed_size": (
+                    int(row["processed_size"] or 0) if row["processed_size"] else None
+                ),
                 "original": original_meta,
                 "processed": processed_meta,
             }
@@ -213,7 +215,11 @@ def create_droppr_media_blueprint(require_admin_access, deps: dict):
                             width=thumb_width,
                         )
                         result = subprocess.run(
-                            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=thumb_ffmpeg_timeout_seconds
+                            cmd,
+                            check=False,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            timeout=thumb_ffmpeg_timeout_seconds,
                         )
                         if result.returncode != 0 and is_video:
                             cmd = ffmpeg_thumbnail_cmd(
@@ -225,7 +231,11 @@ def create_droppr_media_blueprint(require_admin_access, deps: dict):
                                 width=thumb_width,
                             )
                             result = subprocess.run(
-                                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=thumb_ffmpeg_timeout_seconds
+                                cmd,
+                                check=False,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                timeout=thumb_ffmpeg_timeout_seconds,
                             )
                         return result
 

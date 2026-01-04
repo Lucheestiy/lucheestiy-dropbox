@@ -31,7 +31,9 @@ except (TypeError, ValueError):
     REQUEST_PASSWORD_FAILURE_WINDOW_SECONDS = 900
 
 try:
-    REQUEST_PASSWORD_CAPTCHA_THRESHOLD = int(os.environ.get("DROPPR_REQUEST_PASSWORD_CAPTCHA_THRESHOLD", "3"))
+    REQUEST_PASSWORD_CAPTCHA_THRESHOLD = int(
+        os.environ.get("DROPPR_REQUEST_PASSWORD_CAPTCHA_THRESHOLD", "3")
+    )
 except (TypeError, ValueError):
     REQUEST_PASSWORD_CAPTCHA_THRESHOLD = 3
 REQUEST_PASSWORD_CAPTCHA_THRESHOLD = max(1, REQUEST_PASSWORD_CAPTCHA_THRESHOLD)
@@ -61,6 +63,10 @@ _requests_db_ready = False
 
 
 def _normalize_request_password(value: str | None) -> str | None:
+    """
+    Validates and normalizes a file request password.
+    Returns None if the password is too long or empty.
+    """
     if value is None:
         return None
     value = str(value)
@@ -76,7 +82,9 @@ def _prune_failures(failures: deque[float], cutoff: float) -> None:
         failures.popleft()
 
 
-def _get_failure_count(store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock) -> int:
+def _get_failure_count(
+    store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock
+) -> int:
     now = time.time()
     with lock:
         failures = store.get(key)
@@ -89,7 +97,9 @@ def _get_failure_count(store: dict[str, deque[float]], key: str, window_seconds:
         return len(failures)
 
 
-def _record_failure(store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock) -> int:
+def _record_failure(
+    store: dict[str, deque[float]], key: str, window_seconds: int, lock: threading.Lock
+) -> int:
     now = time.time()
     with lock:
         failures = store.get(key)
@@ -129,7 +139,11 @@ def _record_request_password_failure(share_hash: str, ip: str) -> int:
 
 
 def _clear_request_password_failures(share_hash: str, ip: str) -> None:
-    _clear_failures(_request_password_failures, _request_password_key(share_hash, ip), _request_password_failures_lock)
+    _clear_failures(
+        _request_password_failures,
+        _request_password_key(share_hash, ip),
+        _request_password_failures_lock,
+    )
 
 
 def _request_password_blocked(share_hash: str, ip: str) -> bool:
@@ -139,6 +153,10 @@ def _request_password_blocked(share_hash: str, ip: str) -> bool:
 
 
 def _captcha_required_for_request(share_hash: str, ip: str) -> bool:
+    """
+    Determines if a CAPTCHA is required for a given file request based
+    on the number of failed password attempts from the client's IP.
+    """
     if not CAPTCHA_ENABLED or not ip:
         return False
     return _request_password_failure_count(share_hash, ip) >= REQUEST_PASSWORD_CAPTCHA_THRESHOLD
@@ -155,6 +173,9 @@ def _captcha_payload(required: bool) -> dict:
 
 
 def _verify_captcha_token(token: str, ip: str | None) -> bool:
+    """
+    Verifies a CAPTCHA token with the provider (e.g., Cloudflare Turnstile).
+    """
     if not CAPTCHA_ENABLED:
         return True
     token = (token or "").strip()
@@ -177,6 +198,9 @@ def _verify_captcha_token(token: str, ip: str | None) -> bool:
 
 @contextmanager
 def _requests_conn():
+    """
+    Context manager for getting a connection to the file requests SQLite database.
+    """
     _ensure_requests_db()
 
     conn = sqlite3.connect(
@@ -225,8 +249,12 @@ def _init_requests_db() -> None:
             )
             """
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_file_requests_expires_at ON file_requests(expires_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_file_requests_created_at ON file_requests(created_at)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_file_requests_expires_at ON file_requests(expires_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_file_requests_created_at ON file_requests(created_at)"
+        )
     finally:
         conn.close()
 
@@ -287,7 +315,13 @@ def _resolve_request_dir(path: str) -> str | None:
     return target
 
 
-def _create_file_request_record(*, path: str, password_hash: str | None, expires_at: int | None) -> dict:
+def _create_file_request_record(
+    *, path: str, password_hash: str | None, expires_at: int | None
+) -> dict:
+    """
+    Generates a unique share hash and creates a new file request record
+    in the SQLite database. Retries if a hash collision occurs.
+    """
     created_at = int(time.time())
     for _ in range(20):
         share_hash = secrets.token_urlsafe(6).rstrip("=")
@@ -318,6 +352,9 @@ def _create_file_request_record(*, path: str, password_hash: str | None, expires
 
 
 def _fetch_file_request(share_hash: str) -> dict | None:
+    """
+    Retrieves a file request record by its unique share hash.
+    """
     with _requests_conn() as conn:
         row = conn.execute(
             "SELECT hash, path, password_hash, created_at, expires_at FROM file_requests WHERE hash = ?",

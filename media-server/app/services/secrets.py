@@ -19,7 +19,9 @@ AWS_SECRETS_ID = (os.environ.get("DROPPR_AWS_SECRETS_MANAGER_SECRET_ID") or "").
 AWS_REGION = (os.environ.get("DROPPR_AWS_REGION") or os.environ.get("AWS_REGION") or "").strip()
 VAULT_ADDR = (os.environ.get("DROPPR_VAULT_ADDR") or os.environ.get("VAULT_ADDR") or "").strip()
 VAULT_TOKEN = (os.environ.get("DROPPR_VAULT_TOKEN") or os.environ.get("VAULT_TOKEN") or "").strip()
-VAULT_NAMESPACE = (os.environ.get("DROPPR_VAULT_NAMESPACE") or os.environ.get("VAULT_NAMESPACE") or "").strip()
+VAULT_NAMESPACE = (
+    os.environ.get("DROPPR_VAULT_NAMESPACE") or os.environ.get("VAULT_NAMESPACE") or ""
+).strip()
 VAULT_SECRET_PATH = (os.environ.get("DROPPR_VAULT_SECRET_PATH") or "").strip().lstrip("/")
 
 logger = logging.getLogger("droppr.secrets")
@@ -53,7 +55,7 @@ def _load_secrets_file(path: str) -> dict[str, str]:
     if not path:
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, encoding="utf-8") as handle:
             raw = handle.read()
     except OSError:
         return {}
@@ -115,7 +117,9 @@ def _load_external_secrets() -> None:
             raise
 
     try:
-        vault_values = _load_vault_secrets(VAULT_ADDR, VAULT_TOKEN, VAULT_SECRET_PATH, VAULT_NAMESPACE or None)
+        vault_values = _load_vault_secrets(
+            VAULT_ADDR, VAULT_TOKEN, VAULT_SECRET_PATH, VAULT_NAMESPACE or None
+        )
         if vault_values:
             _apply_secret_values(vault_values)
             loaded = True

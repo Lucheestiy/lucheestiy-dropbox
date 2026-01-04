@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import fcntl
 import ipaddress
+import json
 import logging
 import os
+import threading
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -13,16 +15,22 @@ from sqlalchemy.exc import OperationalError
 
 from ..config import parse_bool
 from ..models import ANALYTICS_DB_PATH, AnalyticsBase, get_analytics_engine
-from ..models.analytics import AuthEvent, AuthEventArchive, DownloadEvent, DownloadEventArchive
+from ..models.analytics import AuditEvent, AuthEvent, DownloadEvent
 from ..utils.validation import _normalize_ip
 
 logger = logging.getLogger("droppr.analytics")
 
 ANALYTICS_RETENTION_DAYS = int(os.environ.get("DROPPR_ANALYTICS_RETENTION_DAYS", "180"))
 ANALYTICS_ENABLED = parse_bool(os.environ.get("DROPPR_ANALYTICS_ENABLED", "true"))
-ANALYTICS_LOG_GALLERY_VIEWS = parse_bool(os.environ.get("DROPPR_ANALYTICS_LOG_GALLERY_VIEWS", "true"))
-ANALYTICS_LOG_FILE_DOWNLOADS = parse_bool(os.environ.get("DROPPR_ANALYTICS_LOG_FILE_DOWNLOADS", "true"))
-ANALYTICS_LOG_ZIP_DOWNLOADS = parse_bool(os.environ.get("DROPPR_ANALYTICS_LOG_ZIP_DOWNLOADS", "true"))
+ANALYTICS_LOG_GALLERY_VIEWS = parse_bool(
+    os.environ.get("DROPPR_ANALYTICS_LOG_GALLERY_VIEWS", "true")
+)
+ANALYTICS_LOG_FILE_DOWNLOADS = parse_bool(
+    os.environ.get("DROPPR_ANALYTICS_LOG_FILE_DOWNLOADS", "true")
+)
+ANALYTICS_LOG_ZIP_DOWNLOADS = parse_bool(
+    os.environ.get("DROPPR_ANALYTICS_LOG_ZIP_DOWNLOADS", "true")
+)
 ANALYTICS_IP_MODE = (os.environ.get("DROPPR_ANALYTICS_IP_MODE", "full") or "full").strip().lower()
 ANALYTICS_CACHE_TTL_SECONDS = int(os.environ.get("DROPPR_ANALYTICS_CACHE_TTL_SECONDS", "30"))
 ANALYTICS_CACHE_MAX_ITEMS = int(os.environ.get("DROPPR_ANALYTICS_CACHE_MAX_ITEMS", "256"))
@@ -46,6 +54,13 @@ def _parse_int(value: str | None) -> int | None:
 
 
 def _get_time_range() -> tuple[int, int]:
+    """
+    Parses the 'since', 'until', and 'days' query parameters to determine
+    the time range for analytics queries.
+
+    Returns:
+        A tuple of (start_timestamp, end_timestamp).
+    """
     now = int(time.time())
 
     days = _parse_int(request.args.get("days"))
@@ -59,6 +74,10 @@ def _get_time_range() -> tuple[int, int]:
 
 
 def _get_client_ip() -> str | None:
+    """
+    Retrieves and optionally anonymizes the client's IP address
+    based on the DROPPR_ANALYTICS_IP_MODE setting.
+    """
     if ANALYTICS_IP_MODE == "off":
         return None
 
@@ -94,17 +113,26 @@ def _get_client_ip() -> str | None:
 
 
 class _DriverConnection:
+    """
+    A simple wrapper for SQLAlchemy connection to provide a consistent
+    interface for executing SQL and receiving mappings.
+    """
+
     def __init__(self, conn) -> None:
         self._conn = conn
 
     def execute(self, sql, params: dict | tuple | list | None = None):
         if isinstance(sql, str):
-            return self._conn.exec_driver_sql(sql, params or ())
+            return self._conn.exec_driver_sql(sql, params or ()).mappings()
         return self._conn.execute(sql, params or {})
 
 
 @contextmanager
 def _analytics_conn():
+    """
+    Context manager for getting a connection to the analytics database.
+    Ensures the database is initialized before yielding.
+    """
     if not ANALYTICS_ENABLED:
         raise RuntimeError("Analytics disabled")
 
@@ -195,8 +223,20 @@ def _maybe_apply_retention(conn) -> None:
             """,
             (archived_at, cutoff),
         )
+        conn.execute(
+            """
+            INSERT INTO audit_events_archive (
+                action, target, detail, ip, user_agent, created_at, archived_at
+            )
+            SELECT action, target, detail, ip, user_agent, created_at, ?
+            FROM audit_events
+            WHERE created_at < ?
+            """,
+            (archived_at, cutoff),
+        )
         conn.execute("DELETE FROM download_events WHERE created_at < ?", (cutoff,))
         conn.execute("DELETE FROM auth_events WHERE created_at < ?", (cutoff,))
+        conn.execute("DELETE FROM audit_events WHERE created_at < ?", (cutoff,))
     finally:
         _last_retention_sweep_at = now
 
@@ -242,6 +282,9 @@ def _should_log_event(event_type: str) -> bool:
 
 
 def _log_event(event_type: str, share_hash: str, file_path: str | None = None) -> None:
+    """
+    Logs a download or gallery view event to the analytics database.
+    """
     if not _should_log_event(event_type):
         return
 
@@ -278,6 +321,9 @@ def _log_event(event_type: str, share_hash: str, file_path: str | None = None) -
 
 
 def _log_auth_event(event_type: str, success: bool, detail: str | None = None) -> None:
+    """
+    Logs an authentication attempt (success or failure) to the analytics database.
+    """
     if not ANALYTICS_ENABLED:
         return
 
@@ -311,4 +357,42 @@ def _log_auth_event(event_type: str, success: bool, detail: str | None = None) -
             time.sleep(0.05 * (attempt + 1))
         except Exception as exc:
             logger.warning("Auth logging failed: %s", exc)
+            return
+
+
+def _log_audit_event(action: str, target: str | None = None, detail: dict | None = None) -> None:
+    """
+    Logs an administrative audit event.
+    """
+    if not ANALYTICS_ENABLED:
+        return
+
+    ip = _get_client_ip()
+    user_agent = request.headers.get("User-Agent")
+    created_at = int(time.time())
+    detail_json = json.dumps(detail) if detail is not None else None
+
+    for attempt in range(3):
+        try:
+            with _analytics_conn() as conn:
+                _maybe_apply_retention(conn)
+                conn.execute(
+                    AuditEvent.__table__.insert(),
+                    {
+                        "action": action,
+                        "target": target,
+                        "detail": detail_json,
+                        "ip": ip,
+                        "user_agent": user_agent,
+                        "created_at": created_at,
+                    },
+                )
+            return
+        except OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == 2:
+                logger.warning("Audit logging failed: %s", exc)
+                return
+            time.sleep(0.05 * (attempt + 1))
+        except Exception as exc:
+            logger.warning("Audit logging failed: %s", exc)
             return

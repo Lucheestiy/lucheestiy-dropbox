@@ -23,6 +23,7 @@ export default defineConfig({
         sw: resolve(rootDir, "sw.ts"),
         "test-media": resolve(rootDir, "test-media.ts"),
         "video-player.min": resolve(rootDir, "video-player.ts"),
+        "droppr-panel": resolve(rootDir, "droppr-panel.ts"),
       },
       output: {
         entryFileNames: "[name].js",

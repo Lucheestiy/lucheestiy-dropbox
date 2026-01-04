@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+.env
+database/
+data/
+video-locks/
+hls-cache/
+proxy-cache/
+thumb-cache/
+*.sqlite3

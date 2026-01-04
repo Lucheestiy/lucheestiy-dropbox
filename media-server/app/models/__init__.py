@@ -10,11 +10,17 @@ ANALYTICS_DB_PATH = os.environ.get("DROPPR_ANALYTICS_DB_PATH", "/database/droppr
 ANALYTICS_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_ANALYTICS_DB_TIMEOUT_SECONDS", "30"))
 ANALYTICS_POOL_SIZE = int(os.environ.get("DROPPR_ANALYTICS_POOL_SIZE", "4"))
 
-VIDEO_META_DB_PATH = os.environ.get("DROPPR_VIDEO_META_DB_PATH", "/database/droppr-video-meta.sqlite3")
+VIDEO_META_DB_PATH = os.environ.get(
+    "DROPPR_VIDEO_META_DB_PATH", "/database/droppr-video-meta.sqlite3"
+)
 VIDEO_META_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_VIDEO_META_DB_TIMEOUT_SECONDS", "30"))
+
+COMMENTS_DB_PATH = os.environ.get("DROPPR_COMMENTS_DB_PATH", "/database/droppr-comments.sqlite3")
+COMMENTS_DB_TIMEOUT_SECONDS = float(os.environ.get("DROPPR_COMMENTS_DB_TIMEOUT_SECONDS", "30"))
 
 AnalyticsBase = declarative_base()
 VideoMetaBase = declarative_base()
+CommentsBase = declarative_base()
 
 
 def _sqlite_engine(db_path: str, timeout: float, pool_size: int | None = None):
@@ -49,3 +55,8 @@ def get_analytics_engine():
 @lru_cache(maxsize=1)
 def get_video_meta_engine():
     return _sqlite_engine(VIDEO_META_DB_PATH, VIDEO_META_DB_TIMEOUT_SECONDS, None)
+
+
+@lru_cache(maxsize=1)
+def get_comments_engine():
+    return _sqlite_engine(COMMENTS_DB_PATH, COMMENTS_DB_TIMEOUT_SECONDS, None)

@@ -1,608 +1,813 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dropbox Analytics</title>
-    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
-    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="manifest" href="/static/manifest.json" />
+    <meta name="theme-color" content="#0061ff" />
+    <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://browser.sentry-cdn.com" />
     <style>
-        /* Dark Theme (default) */
-        :root {
-            --bg: #0f172a;
-            --panel: rgba(30, 41, 59, 0.75);
-            --panel-solid: #1e293b;
-            --border: rgba(255, 255, 255, 0.12);
-            --text: #f1f5f9;
-            --muted: #94a3b8;
-            --accent: #6366f1;
-            --accent-hover: #4f46e5;
-            --danger: #ef4444;
-            --success: #10b981;
-            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            --input-bg: rgba(0, 0, 0, 0.22);
-            --topbar-bg: rgba(15, 23, 42, 0.65);
+      /* Dark Theme (default) */
+      :root {
+        --bg: #0f172a;
+        --panel: rgba(30, 41, 59, 0.75);
+        --panel-solid: #1e293b;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --accent: #6366f1;
+        --accent-hover: #4f46e5;
+        --danger: #ef4444;
+        --success: #10b981;
+        --mono:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+          monospace;
+        --input-bg: rgba(0, 0, 0, 0.22);
+        --topbar-bg: rgba(15, 23, 42, 0.65);
+      }
+
+      /* Light Theme */
+      [data-theme="light"] {
+        --bg: #f8fafc;
+        --panel: rgba(255, 255, 255, 0.85);
+        --panel-solid: #ffffff;
+        --border: rgba(0, 0, 0, 0.1);
+        --text: #1e293b;
+        --muted: #475569; /* Improved contrast ratio */
+        --accent: #4f46e5;
+        --accent-hover: #4338ca;
+        --danger: #dc2626;
+        --success: #059669;
+        --input-bg: rgba(0, 0, 0, 0.05);
+        --topbar-bg: rgba(248, 250, 252, 0.85);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      /* Accessibility: Improved Focus Indicators */
+      :focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* Skip to content link */
+      .skip-link {
+        position: absolute;
+        top: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--accent);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0 0 10px 10px;
+        z-index: 10000;
+        text-decoration: none;
+        font-weight: 600;
+        transition: top 0.2s;
+      }
+
+      .skip-link:focus {
+        top: 0;
+      }
+
+      /* Accessibility: Reduced Motion */
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
         }
+      }
 
-        /* Light Theme */
-        [data-theme="light"] {
-            --bg: #f8fafc;
-            --panel: rgba(255, 255, 255, 0.85);
-            --panel-solid: #ffffff;
-            --border: rgba(0, 0, 0, 0.1);
-            --text: #1e293b;
-            --muted: #64748b;
-            --accent: #4f46e5;
-            --accent-hover: #4338ca;
-            --danger: #dc2626;
-            --success: #059669;
-            --input-bg: rgba(0, 0, 0, 0.05);
-            --topbar-bg: rgba(248, 250, 252, 0.85);
-        }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
+          sans-serif;
+        background: var(--bg);
+        background-image:
+          radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+          radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+          radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+        color: var(--text);
+      }
 
-        * { box-sizing: border-box; }
-        html, body { height: 100%; }
-        body {
-            margin: 0;
-            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-            background: var(--bg);
-            background-image:
-                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%),
-                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%),
-                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-            color: var(--text);
-        }
+      /* Light theme body background */
+      [data-theme="light"] body,
+      body[data-theme="light"] {
+        background-image:
+          radial-gradient(at 0% 0%, hsla(220, 30%, 96%, 1) 0, transparent 50%),
+          radial-gradient(at 50% 0%, hsla(220, 40%, 92%, 1) 0, transparent 50%),
+          radial-gradient(at 100% 0%, hsla(280, 30%, 95%, 1) 0, transparent 50%);
+      }
 
-        /* Light theme body background */
-        [data-theme="light"] body,
-        body[data-theme="light"] {
-            background-image:
-                radial-gradient(at 0% 0%, hsla(220,30%,96%,1) 0, transparent 50%),
-                radial-gradient(at 50% 0%, hsla(220,40%,92%,1) 0, transparent 50%),
-                radial-gradient(at 100% 0%, hsla(280,30%,95%,1) 0, transparent 50%);
-        }
+      a {
+        color: inherit;
+      }
 
-        a { color: inherit; }
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(10px);
+        background: rgba(15, 23, 42, 0.65);
+      }
 
-        .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(10px);
-            background: rgba(15, 23, 42, 0.65);
-        }
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
 
-        .topbar-inner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+      .title {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
 
-        .title {
-            display: flex;
-            flex-direction: column;
-            gap: 0.15rem;
-        }
+      .title h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        letter-spacing: -0.02em;
+      }
 
-        .title h1 {
-            margin: 0;
-            font-size: 1.35rem;
-            letter-spacing: -0.02em;
-        }
+      .title .sub {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
 
-        .title .sub {
-            color: var(--muted);
-            font-size: 0.95rem;
-        }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        justify-content: flex-end;
+      }
 
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.6rem;
-            justify-content: flex-end;
-        }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
 
-        .chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.6rem 0.75rem;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: rgba(0,0,0,0.18);
-            color: var(--muted);
-            font-size: 0.9rem;
-        }
+      select,
+      input[type="text"] {
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.95rem;
+        outline: none;
+      }
 
-        select, input[type="text"] {
-            background: rgba(0,0,0,0.22);
-            border: 1px solid var(--border);
-            color: var(--text);
-            border-radius: 12px;
-            padding: 0.65rem 0.85rem;
-            font-size: 0.95rem;
-            outline: none;
-        }
+      select:focus,
+      input[type="text"]:focus {
+        border-color: rgba(99, 102, 241, 0.65);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      }
 
-        select:focus, input[type="text"]:focus {
-            border-color: rgba(99, 102, 241, 0.65);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-        }
+      .btn {
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        border-radius: 12px;
+        padding: 0.68rem 0.95rem;
+        font-size: 0.95rem;
+        transition:
+          transform 0.08s ease,
+          background 0.15s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
 
-        .btn {
-            border: none;
-            cursor: pointer;
-            font-weight: 600;
-            border-radius: 12px;
-            padding: 0.68rem 0.95rem;
-            font-size: 0.95rem;
-            transition: transform 0.08s ease, background 0.15s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+      .btn.primary {
+        background: var(--accent);
+        color: white;
+      }
+      .btn.primary:hover {
+        background: var(--accent-hover);
+      }
+      .btn.secondary {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .btn.secondary:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
 
-        .btn.primary { background: var(--accent); color: white; }
-        .btn.primary:hover { background: var(--accent-hover); }
-        .btn.secondary { background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border); color: var(--text); }
-        .btn.secondary:hover { background: rgba(255, 255, 255, 0.12); }
-        .btn:active { transform: translateY(1px); }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 3rem;
+      }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1.25rem 1.5rem 3rem;
-        }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
 
+      @media (max-width: 1000px) {
         .grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+      }
 
-        @media (max-width: 1000px) {
-            .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      @media (max-width: 560px) {
+        .grid {
+          grid-template-columns: 1fr;
         }
+      }
 
-        @media (max-width: 560px) {
-            .grid { grid-template-columns: 1fr; }
-        }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1rem 1rem;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.55);
+      }
 
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 1rem 1rem;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 10px 30px -18px rgba(0,0,0,0.55);
-        }
+      .metric-label {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
 
-        .metric-label {
-            color: var(--muted);
-            font-size: 0.9rem;
-        }
+      .metric-value {
+        margin-top: 0.5rem;
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
 
-        .metric-value {
-            margin-top: 0.5rem;
-            font-size: 1.6rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-        }
+      .panel {
+        margin-top: 1rem;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        backdrop-filter: blur(8px);
+      }
 
-        .panel {
-            margin-top: 1rem;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            overflow: hidden;
-            backdrop-filter: blur(8px);
-        }
+      .panel-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.18);
+      }
 
-        .panel-header {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            background: rgba(0,0,0,0.18);
-        }
+      .panel-header-left {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
 
-        .panel-header-left {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            align-items: center;
-        }
+      .panel-header-right {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: flex-end;
+      }
 
-        .panel-header-right {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            align-items: center;
-            justify-content: flex-end;
-        }
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+        user-select: none;
+      }
 
-        .toggle {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--muted);
-            font-size: 0.9rem;
-            user-select: none;
-        }
+      .toggle input {
+        accent-color: var(--accent);
+      }
 
-        .toggle input { accent-color: var(--accent); }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95rem;
-        }
+      th,
+      td {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
+        vertical-align: middle;
+      }
 
-        th, td {
-            padding: 0.85rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            text-align: left;
-            vertical-align: middle;
-        }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: rgba(0, 0, 0, 0.12);
+      }
 
-        th {
-            color: var(--muted);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            background: rgba(0,0,0,0.12);
-        }
+      tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+      }
 
-        tr:hover td { background: rgba(255,255,255,0.03); }
+      .mono {
+        font-family: var(--mono);
+      }
+      .muted {
+        color: var(--muted);
+      }
 
-        .mono { font-family: var(--mono); }
-        .muted { color: var(--muted); }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.55rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--text);
+        font-size: 0.85rem;
+      }
 
-        .tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            padding: 0.3rem 0.55rem;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.12);
-            color: var(--text);
-            font-size: 0.85rem;
-        }
+      .tag.good {
+        border-color: rgba(16, 185, 129, 0.5);
+        background: rgba(16, 185, 129, 0.12);
+      }
+      .tag.warn {
+        border-color: rgba(239, 68, 68, 0.5);
+        background: rgba(239, 68, 68, 0.12);
+      }
 
-        .tag.good { border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.12); }
-        .tag.warn { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.12); }
+      .row-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
 
-        .row-actions {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
+      .row-actions .btn {
+        padding: 0.45rem 0.7rem;
+        border-radius: 10px;
+        font-size: 0.9rem;
+      }
 
-        .row-actions .btn { padding: 0.45rem 0.7rem; border-radius: 10px; font-size: 0.9rem; }
+      .status {
+        margin-top: 1rem;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
 
-        .status {
-            margin-top: 1rem;
-            color: var(--muted);
-            font-size: 0.95rem;
-        }
+      .status.error {
+        color: #fecaca;
+      }
 
-        .status.error { color: #fecaca; }
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 1000;
+        padding: 1.25rem;
+      }
 
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.85);
-            z-index: 1000;
-            padding: 1.25rem;
-        }
+      .modal.show {
+        display: block;
+      }
 
-        .modal.show { display: block; }
+      .modal-card {
+        max-width: 1100px;
+        margin: 0 auto;
+        background: rgba(15, 23, 42, 0.98);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 25px 60px -20px rgba(0, 0, 0, 0.75);
+      }
 
-        .modal-card {
-            max-width: 1100px;
-            margin: 0 auto;
-            background: rgba(15,23,42,0.98);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            overflow: hidden;
-            box-shadow: 0 25px 60px -20px rgba(0,0,0,0.75);
-        }
+      .modal-header {
+        padding: 1rem 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+      }
 
-        .modal-header {
-            padding: 1rem 1.1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            border-bottom: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
-        }
+      .modal-header h2 {
+        margin: 0;
+        font-size: 1.05rem;
+        letter-spacing: -0.02em;
+      }
 
-        .modal-header h2 {
-            margin: 0;
-            font-size: 1.05rem;
-            letter-spacing: -0.02em;
-        }
+      .modal-body {
+        padding: 1rem 1.1rem 1.25rem;
+        max-height: calc(100vh - 190px);
+        overflow: auto;
+      }
 
-        .modal-body {
-            padding: 1rem 1.1rem 1.25rem;
-            max-height: calc(100vh - 190px);
-            overflow: auto;
-        }
+      .modal-footer {
+        padding: 1rem 1.1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        justify-content: flex-end;
+        border-top: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+      }
 
-        .modal-footer {
-            padding: 1rem 1.1rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.6rem;
-            justify-content: flex-end;
-            border-top: 1px solid var(--border);
-            background: rgba(255,255,255,0.03);
-        }
+      .close {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 12px;
+        cursor: pointer;
+        padding: 0.55rem 0.7rem;
+        font-weight: 700;
+      }
 
-        .close {
-            background: rgba(255,255,255,0.08);
-            border: 1px solid var(--border);
-            color: var(--text);
-            border-radius: 12px;
-            cursor: pointer;
-            padding: 0.55rem 0.7rem;
-            font-weight: 700;
-        }
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.9rem;
+      }
 
+      @media (max-width: 900px) {
         .detail-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.9rem;
+          grid-template-columns: 1fr;
         }
+      }
 
-        @media (max-width: 900px) {
-            .detail-grid { grid-template-columns: 1fr; }
-        }
+      .detail-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 0.9rem;
+      }
 
-        .detail-card {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 16px;
-            padding: 0.9rem;
-        }
+      .detail-card .label {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .detail-card .value {
+        margin-top: 0.4rem;
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
 
-        .detail-card .label { color: var(--muted); font-size: 0.9rem; }
-        .detail-card .value { margin-top: 0.4rem; font-size: 1.25rem; font-weight: 700; }
+      .section-title {
+        margin: 1.2rem 0 0.6rem;
+        font-size: 0.95rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
 
-        .section-title {
-            margin: 1.2rem 0 0.6rem;
-            font-size: 0.95rem;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
+      /* Theme Toggle Button */
+      .theme-toggle {
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.68rem;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+      }
 
-        /* Theme Toggle Button */
-        .theme-toggle {
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 0.68rem;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 42px;
-            height: 42px;
-        }
+      .theme-toggle:hover {
+        background: rgba(255, 255, 255, 0.12);
+        transform: scale(1.05);
+      }
 
-        .theme-toggle:hover {
-            background: rgba(255, 255, 255, 0.12);
-            transform: scale(1.05);
-        }
+      /* Light Theme Specific Overrides */
+      [data-theme="light"] .topbar {
+        background: var(--topbar-bg);
+      }
 
-        /* Light Theme Specific Overrides */
-        [data-theme="light"] .topbar {
-            background: var(--topbar-bg);
-        }
+      [data-theme="light"] select,
+      [data-theme="light"] input[type="text"] {
+        background: var(--input-bg);
+      }
 
-        [data-theme="light"] select,
-        [data-theme="light"] input[type="text"] {
-            background: var(--input-bg);
-        }
+      [data-theme="light"] .chip {
+        background: var(--input-bg);
+      }
 
-        [data-theme="light"] .chip {
-            background: var(--input-bg);
-        }
+      [data-theme="light"] .btn.secondary {
+        background: var(--input-bg);
+      }
 
-        [data-theme="light"] .btn.secondary {
-            background: var(--input-bg);
-        }
+      [data-theme="light"] .btn.secondary:hover {
+        background: rgba(0, 0, 0, 0.08);
+      }
 
-        [data-theme="light"] .btn.secondary:hover {
-            background: rgba(0, 0, 0, 0.08);
-        }
+      [data-theme="light"] .theme-toggle:hover {
+        background: rgba(0, 0, 0, 0.08);
+      }
 
-        [data-theme="light"] .theme-toggle:hover {
-            background: rgba(0, 0, 0, 0.08);
-        }
+      [data-theme="light"] .card {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
 
-        [data-theme="light"] .card {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
+      [data-theme="light"] .panel-header {
+        background: var(--input-bg);
+      }
 
-        [data-theme="light"] .panel-header {
-            background: var(--input-bg);
-        }
+      [data-theme="light"] .detail-card {
+        background: var(--input-bg);
+        border: 1px solid var(--border);
+      }
 
-        [data-theme="light"] .detail-card {
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-        }
+      [data-theme="light"] table tbody tr:hover td {
+        background: rgba(0, 0, 0, 0.03);
+      }
 
-        [data-theme="light"] table tbody tr:hover td {
-            background: rgba(0, 0, 0, 0.03);
-        }
+      [data-theme="light"] .tag {
+        background: rgba(99, 102, 241, 0.15);
+      }
 
-        [data-theme="light"] .tag {
-            background: rgba(99, 102, 241, 0.15);
-        }
+      .btn.active {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+
+      .tabs .btn {
+        min-width: 120px;
+        justify-content: center;
+      }
+
+      pre.mono {
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <a href="#sharesBody" class="skip-link">Skip to content</a>
     <div class="topbar">
-        <div class="topbar-inner">
-            <div class="title">
-                <h1>Dropbox Analytics</h1>
-                <div class="sub" id="rangeLabel">—</div>
-            </div>
-            <div class="controls">
-                <select id="rangeSelect" aria-label="Time range">
-                    <option value="7">Last 7 days</option>
-                    <option value="30" selected>Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                    <option value="365">Last 365 days</option>
-                    <option value="0">All time</option>
-                </select>
-                <button class="theme-toggle" id="themeToggle" title="Toggle dark/light theme" aria-label="Toggle theme">🌙</button>
-                <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
-                <a class="btn primary" href="/settings/shares" target="_blank" rel="noopener">Manage Shares</a>
-            </div>
+      <div class="topbar-inner">
+        <div class="title">
+          <h1>Dropbox Analytics</h1>
+          <div class="sub" id="rangeLabel">—</div>
         </div>
+        <div class="controls">
+          <label class="toggle" style="margin-right: 1rem">
+            <input type="checkbox" id="autoRefresh" />
+            Live
+          </label>
+          <select id="rangeSelect" aria-label="Time range">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="365">Last 365 days</option>
+            <option value="0">All time</option>
+          </select>
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            title="Toggle dark/light theme"
+            aria-label="Toggle theme"
+          >
+            🌙
+          </button>
+          <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
+          <a class="btn primary" href="/settings/shares" target="_blank" rel="noopener"
+            >Manage Shares</a
+          >
+        </div>
+      </div>
     </div>
 
     <div class="container">
+      <div class="tabs" role="tablist" style="display: flex; gap: 1rem; margin-bottom: 1rem">
+        <button
+          class="btn secondary active"
+          id="tabShares"
+          role="tab"
+          aria-selected="true"
+          aria-controls="sharesPanel"
+        >
+          Shares
+        </button>
+        <button
+          class="btn secondary"
+          id="tabAudit"
+          role="tab"
+          aria-selected="false"
+          aria-controls="auditPanel"
+        >
+          Audit Log
+        </button>
+      </div>
+
+      <div id="sharesPanel" role="tabpanel" aria-labelledby="tabShares">
         <div class="grid">
-            <div class="card">
-                <div class="metric-label">Total Downloads</div>
-                <div class="metric-value" id="metricDownloads">—</div>
-            </div>
-            <div class="card">
-                <div class="metric-label">ZIP Downloads</div>
-                <div class="metric-value" id="metricZip">—</div>
-            </div>
-            <div class="card">
-                <div class="metric-label">File Downloads</div>
-                <div class="metric-value" id="metricFiles">—</div>
-            </div>
-            <div class="card">
-                <div class="metric-label">Gallery Views</div>
-                <div class="metric-value" id="metricViews">—</div>
-            </div>
+          <div class="card">
+            <div class="metric-label">Total Downloads</div>
+            <div class="metric-value" id="metricDownloads">—</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">ZIP Downloads</div>
+            <div class="metric-value" id="metricZip">—</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">File Downloads</div>
+            <div class="metric-value" id="metricFiles">—</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Gallery Views</div>
+            <div class="metric-value" id="metricViews">—</div>
+          </div>
         </div>
 
         <div class="panel">
-            <div class="panel-header">
-                <div class="panel-header-left">
-                    <input type="text" id="searchInput" placeholder="Search by path or hash…" />
-                    <label class="toggle">
-                        <input type="checkbox" id="includeEmpty" checked />
-                        Show empty shares
-                    </label>
-                </div>
-                <div class="panel-header-right">
-                    <span class="chip" id="sharesCount">—</span>
-                </div>
+          <div class="panel-header">
+            <div class="panel-header-left">
+              <input type="text" id="searchInput" placeholder="Search by path or hash…" />
+              <label class="toggle">
+                <input type="checkbox" id="includeEmpty" checked />
+                Show empty shares
+              </label>
             </div>
-            <div style="overflow:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Share</th>
-                            <th>Downloads</th>
-                            <th>Views</th>
-                            <th>Unique IPs</th>
-                            <th>Last Activity</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sharesBody">
-                        <tr><td colspan="6" class="muted">Loading…</td></tr>
-                    </tbody>
-                </table>
+            <div class="panel-header-right">
+              <span class="chip" id="sharesCount">—</span>
             </div>
+          </div>
+          <div style="overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Share</th>
+                  <th>Downloads</th>
+                  <th>Views</th>
+                  <th>Unique IPs</th>
+                  <th>Last Activity</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="sharesBody">
+                <tr>
+                  <td colspan="6" class="muted">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
 
-        <div class="status" id="status"></div>
+      <div id="auditPanel" role="tabpanel" aria-labelledby="tabAudit" style="display: none">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-header-left">
+              <h2 style="margin: 0; font-size: 1.1rem">System Audit Events</h2>
+            </div>
+            <div class="panel-header-right">
+              <span class="chip" id="auditCount">—</span>
+            </div>
+          </div>
+          <div style="overflow: auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                  <th>IP / User Agent</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="auditBody">
+                <tr>
+                  <td colspan="5" class="muted">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="status" id="status"></div>
     </div>
 
     <div class="modal" id="detailModal" role="dialog" aria-modal="true">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div>
-                    <h2 id="detailTitle">—</h2>
-                    <div class="muted" id="detailSub">—</div>
-                </div>
-                <button class="close" id="detailClose" type="button">Close</button>
-            </div>
-            <div class="modal-body">
-                <div class="detail-grid" id="detailMetrics"></div>
-
-                <div class="section-title">Downloads by IP</div>
-                <div class="panel" style="margin-top:0;">
-                    <div style="overflow:auto;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>IP</th>
-                                    <th>Downloads</th>
-                                    <th>ZIP</th>
-                                    <th>Files</th>
-                                    <th>Last Seen</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ipsBody">
-                                <tr><td colspan="5" class="muted">—</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="section-title">Recent Events</div>
-                <div class="panel" style="margin-top:0;">
-                    <div style="overflow:auto;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>When</th>
-                                    <th>Type</th>
-                                    <th>IP</th>
-                                    <th>File</th>
-                                    <th>User Agent</th>
-                                </tr>
-                            </thead>
-                            <tbody id="eventsBody">
-                                <tr><td colspan="5" class="muted">—</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn secondary" id="exportCsvBtn" type="button">Export CSV</button>
-                <a class="btn primary" id="openGalleryBtn" href="#" target="_blank" rel="noopener">Open Gallery</a>
-            </div>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <h2 id="detailTitle">—</h2>
+            <div class="muted" id="detailSub">—</div>
+          </div>
+          <button class="close" id="detailClose" type="button">Close</button>
         </div>
+        <div class="modal-body">
+          <div class="detail-grid" id="detailMetrics"></div>
+
+          <div class="section-title">Downloads by IP</div>
+          <div class="panel" style="margin-top: 0">
+            <div style="overflow: auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>IP</th>
+                    <th>Downloads</th>
+                    <th>ZIP</th>
+                    <th>Files</th>
+                    <th>Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody id="ipsBody">
+                  <tr>
+                    <td colspan="5" class="muted">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="section-title">Recent Events</div>
+          <div class="panel" style="margin-top: 0">
+            <div style="overflow: auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Type</th>
+                    <th>IP</th>
+                    <th>File</th>
+                    <th>User Agent</th>
+                  </tr>
+                </thead>
+                <tbody id="eventsBody">
+                  <tr>
+                    <td colspan="5" class="muted">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn secondary" id="exportCsvBtn" type="button">Export CSV</button>
+          <a class="btn primary" id="openGalleryBtn" href="#" target="_blank" rel="noopener"
+            >Open Gallery</a
+          >
+        </div>
+      </div>
     </div>
 
-    <script defer src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js" crossorigin="anonymous"></script>
+    <script
+      defer
+      src="https://browser.sentry-cdn.com/7.114.0/bundle.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script defer src="/static/config.js?v=2"></script>
     <script defer src="/static/sentry-init.js?v=1"></script>
     <script defer src="/static/analytics.js?v=1"></script>
     <script defer src="/static/sw-register.js?v=1"></script>
-</body>
+  </body>
 </html>

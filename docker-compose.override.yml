@@ -1,0 +1,25 @@
+services:
+  media-server:
+    command: gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 1 --reload --access-logfile - --error-logfile - app:app
+    environment:
+      - FLASK_DEBUG=1
+      - DROPPR_ANALYTICS_ENABLED=true
+    volumes:
+      - ./media-server/app:/app/app
+      - ./media-server/tests:/app/tests
+
+  media-worker:
+    command: celery -A app.celery_app worker --loglevel=debug --concurrency=1
+    environment:
+      - FLASK_DEBUG=1
+    volumes:
+      - ./media-server/app:/app/app
+
+  dropbox:
+    ports:
+      - "8099:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/static:/usr/share/nginx/html/static:ro
+      - ./nginx/gallery.html:/usr/share/nginx/html/gallery.html:ro
+      - ./nginx/stream-gallery.html:/usr/share/nginx/html/stream-gallery.html:ro

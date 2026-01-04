@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /api/
+Disallow: /files/
+Disallow: /settings/
+Disallow: /users/
+Allow: /gallery/
+Allow: /stream/
+Allow: /request/
+Allow: /player
+Allow: /
