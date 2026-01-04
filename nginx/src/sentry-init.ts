@@ -1,7 +1,7 @@
-(function () {
+(function (): void {
   "use strict";
   if (!window.Sentry) return;
-  var cfg = window.DROPPR_CONFIG || {};
+  const cfg = window.DROPPR_CONFIG || {};
   if (!cfg.sentryDsn) return;
 
   window.Sentry.init({

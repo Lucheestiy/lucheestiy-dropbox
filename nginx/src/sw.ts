@@ -1,6 +1,10 @@
+/// <reference lib="webworker" />
+
+declare const self: ServiceWorkerGlobalScope;
+
 const CACHE_VERSION = 'v6';
 const STATIC_CACHE = `droppr-static-${CACHE_VERSION}`;
-const CORE_ASSETS = [
+const CORE_ASSETS: string[] = [
   '/static/gallery.min.css?v=2',
   '/static/gallery.min.js?v=3',
   '/static/video-player.min.css?v=1',
@@ -16,25 +20,25 @@ const CORE_ASSETS = [
   '/droppr-panel.js?v=32'
 ];
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event: ExtendableEvent) => {
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
-      .then(cache => cache.addAll(CORE_ASSETS))
+      .then((cache: Cache) => cache.addAll(CORE_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (event: ExtendableEvent) => {
   event.waitUntil(
     caches
       .keys()
-      .then(keys => Promise.all(keys.filter(key => key !== STATIC_CACHE).map(key => caches.delete(key))))
+      .then((keys: string[]) => Promise.all(keys.filter((key: string) => key !== STATIC_CACHE).map((key: string) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', (event: FetchEvent) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
@@ -49,15 +53,17 @@ self.addEventListener('fetch', event => {
   if (!isStatic) return;
 
   event.respondWith(
-    caches.match(req).then(cached => {
+    caches.match(req).then((cached: Response | undefined) => {
       if (cached) return cached;
       return fetch(req)
-        .then(res => {
+        .then((res: Response) => {
           const copy = res.clone();
-          caches.open(STATIC_CACHE).then(cache => cache.put(req, copy));
+          caches.open(STATIC_CACHE).then((cache: Cache) => cache.put(req, copy));
           return res;
         })
-        .catch(() => cached);
+        .catch(() => cached ?? new Response('Not found', { status: 404 }));
     })
   );
 });
+
+export {};

@@ -1,14 +1,2 @@
-// Add video loading behavior
-        document.querySelectorAll('video').forEach(video => {
-            const loader = video.parentElement.querySelector('.video-loader');
-            if (loader) {
-                video.onloadstart = () => loader.style.display = 'block';
-                video.onwaiting = () => loader.style.display = 'block';
-                video.oncanplaythrough = () => loader.style.display = 'none';
-                video.onplaying = () => loader.style.display = 'none';
-                video.onerror = () => {
-                    loader.style.display = 'none';
-                    console.error('Video failed to load:', video.src);
-                };
-            }
-        });
+document.querySelectorAll("video").forEach(l=>{const e=l.parentElement,o=e==null?void 0:e.querySelector(".video-loader");o&&(l.onloadstart=()=>{o.style.display="block"},l.onwaiting=()=>{o.style.display="block"},l.oncanplaythrough=()=>{o.style.display="none"},l.onplaying=()=>{o.style.display="none"},l.onerror=()=>{o.style.display="none",console.error("Video failed to load:",l.src)})});
+//# sourceMappingURL=test-media.js.map
