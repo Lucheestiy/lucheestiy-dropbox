@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
+trap "" HUP  # Ignore hangup signal to survive SSH disconnect
 # Safe Rebuild Dropbox (SRDROPBOX)
 # - Stops the Dropbox stack, rebuilds images, and restarts the stack
 # - Optionally starts the Cloudflare tunnel profile if requested (or if currently running)
